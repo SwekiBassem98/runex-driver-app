@@ -3,7 +3,7 @@ import { mockDriverProfile } from './drivers.service';
 import { useAuthStore } from '@/store/auth.store';
 
 export interface LoginPayload {
-  phone: string;
+  identifier: string; // Phone number or matricule (e.g. 27949967 or 6383 TUN 181)
   password: string;
 }
 
@@ -21,32 +21,46 @@ export interface AuthService {
 }
 
 const delay = (ms?: number) =>
-  new Promise((resolve) => setTimeout(resolve, ms ?? 350 + Math.random() * 250));
+  new Promise((resolve) => setTimeout(resolve, ms ?? 400 + Math.random() * 200));
 
 class MockAuthService implements AuthService {
   async login(credentials: LoginPayload): Promise<AuthResponse> {
     await delay();
 
-    const cleanPhone = credentials.phone.replace(/\s+/g, '');
-    if (!cleanPhone || cleanPhone.length < 8) {
+    const cleanId = (credentials.identifier || '').trim();
+    const cleanPass = (credentials.password || '').trim();
+
+    if (!cleanId) {
       throw new AppApiError(
         400,
-        'Numéro de téléphone tunisien invalide (ex: 27949967).',
-        'INVALID_PHONE_NUMBER'
+        'Veuillez renseigner votre numéro de téléphone ou matricule.',
+        'EMPTY_IDENTIFIER'
       );
     }
 
-    if (!credentials.password || credentials.password.length < 4) {
+    if (!cleanPass) {
+      throw new AppApiError(400, 'Veuillez renseigner votre mot de passe.', 'EMPTY_PASSWORD');
+    }
+
+    // Mock failure path for specific test input "0000" (phone, matricule, or password)
+    if (cleanId === '0000' || cleanPass === '0000') {
       throw new AppApiError(
-        400,
-        'Le mot de passe doit comporter au moins 4 caractères.',
-        'INVALID_PASSWORD'
+        401,
+        'Identifiants incorrects. Vérifiez votre matricule ou numéro de téléphone et réessayez.',
+        'INVALID_CREDENTIALS'
       );
     }
 
     const token = `rnx_jwt_${Date.now()}_tunisia_livreur`;
     const refreshToken = `rnx_refresh_${Date.now()}`;
-    const driver = { ...mockDriverProfile };
+
+    // Customize mock driver with provided identifier if provided
+    const isPhone = /^[0-9+ ]+$/.test(cleanId);
+    const driver: Driver = {
+      ...mockDriverProfile,
+      phone: isPhone ? cleanId : mockDriverProfile.phone,
+      matricule: !isPhone ? cleanId.toUpperCase() : mockDriverProfile.matricule,
+    };
 
     // Update Zustand auth store
     useAuthStore.getState().setAuth(token, refreshToken, driver);
@@ -59,12 +73,12 @@ class MockAuthService implements AuthService {
   }
 
   async logout(): Promise<void> {
-    await delay(200);
+    await delay(150);
     useAuthStore.getState().logout();
   }
 
   async refreshToken(refreshToken: string): Promise<{ token: string }> {
-    await delay(200);
+    await delay(150);
     if (!refreshToken) {
       throw new AppApiError(401, 'Token de rafraîchissement absent.', 'INVALID_REFRESH_TOKEN');
     }
