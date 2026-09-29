@@ -14,6 +14,7 @@ import { useAuthStore } from '@/store/auth.store';
 export interface RunsheetsService {
   getActiveRunsheet(): Promise<Runsheet>;
   getRunsheetById(id: string): Promise<Runsheet>;
+  getParcelById(parcelId: string): Promise<Parcel>;
   deliverParcel(parcelId: string, payload?: DeliverParcelPayload): Promise<Parcel>;
   returnParcel(parcelId: string, payload: ReturnParcelPayload): Promise<Parcel>;
   postponeParcel(parcelId: string, payload: PostponeParcelPayload): Promise<Parcel>;
@@ -190,6 +191,15 @@ class MockRunsheetsService implements RunsheetsService {
       parcels: [...this.inMemoryParcels],
       createdAt: new Date().toISOString(),
     };
+  }
+
+  async getParcelById(parcelId: string): Promise<Parcel> {
+    await delay(150);
+    const parcel = this.inMemoryParcels.find((p) => p.id === parcelId);
+    if (!parcel) {
+      throw new AppApiError(404, 'Colis introuvable.', 'PARCEL_NOT_FOUND');
+    }
+    return { ...parcel };
   }
 
   async deliverParcel(parcelId: string, payload?: DeliverParcelPayload): Promise<Parcel> {
