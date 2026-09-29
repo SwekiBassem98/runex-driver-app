@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, View, Text, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients, typography, spacing, radii, shadows } from '@/theme';
 import {
@@ -16,6 +16,9 @@ import {
   SecondaryButton,
   IconButton,
 } from '@/components';
+import { runsheetsService, driversService, dashboardService } from '@/services';
+import { Runsheet, Driver, DashboardStats, ApiError, formatTND } from '@/types';
+import { useUiStore } from '@/store/ui.store';
 
 /**
  * RUNEX Component Gallery & Design System Review
@@ -30,6 +33,97 @@ export default function ComponentGalleryScreen() {
   const [show403Banner, setShow403Banner] = useState(true);
   const [showNetworkBanner, setShowNetworkBanner] = useState(true);
 
+  // Live Data Layer state
+  const [driver, setDriver] = useState<Driver | null>(null);
+  const [runsheet, setRunsheet] = useState<Runsheet | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [liveError, setLiveError] = useState<ApiError | null>(null);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  const { simulateEmptyRunsheet, setSimulateEmptyRunsheet } = useUiStore();
+
+  const loadData = useCallback(async () => {
+    setDataLoading(true);
+    setLiveError(null);
+    try {
+      const [drv, rsh, st] = await Promise.all([
+        driversService.getCurrentDriver(),
+        runsheetsService.getActiveRunsheet(),
+        dashboardService.getDashboardStats(),
+      ]);
+      setDriver(drv);
+      setRunsheet(rsh);
+      setStats(st);
+    } catch (err: unknown) {
+      const apiErr = err as ApiError;
+      setLiveError(apiErr);
+    } finally {
+      setDataLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+    Promise.all([
+      driversService.getCurrentDriver(),
+      runsheetsService.getActiveRunsheet(),
+      dashboardService.getDashboardStats(),
+    ])
+      .then(([drv, rsh, st]) => {
+        if (!isMounted) return;
+        setDriver(drv);
+        setRunsheet(rsh);
+        setStats(st);
+      })
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setLiveError(err as ApiError);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [simulateEmptyRunsheet]);
+
+  const handleTestDeliver = async () => {
+    if (!runsheet?.parcels.length) return;
+    const target = runsheet.parcels.find((p) => p.status === 'in_transit') || runsheet.parcels[0];
+    try {
+      setLiveError(null);
+      await runsheetsService.deliverParcel(target.id, { notes: 'Livraison test validée' });
+      await loadData();
+    } catch (err: unknown) {
+      setLiveError(err as ApiError);
+    }
+  };
+
+  const handleTestPostpone403 = async () => {
+    if (!runsheet?.parcels.length) return;
+    const target = runsheet.parcels[0];
+    try {
+      setLiveError(null);
+      // This will trigger the simulated 403 COLIS_UPDATE permission restriction
+      await runsheetsService.postponeParcel(target.id, {
+        reason: 'Client absent au rendez-vous',
+        nextDeliveryDate: '2026-09-30',
+      });
+      await loadData();
+    } catch (err: unknown) {
+      setLiveError(err as ApiError);
+    }
+  };
+
+  const handleTestUnassigned403 = async () => {
+    // pcl-008 is deliberately unassigned to drv-7701
+    try {
+      setLiveError(null);
+      await runsheetsService.deliverParcel('pcl-008');
+      await loadData();
+    } catch (err: unknown) {
+      setLiveError(err as ApiError);
+    }
+  };
+
   const pickupTabs = [
     { id: 'tous', label: 'Tous', count: 12 },
     { id: 'en_cours', label: 'En cours', count: 4 },
@@ -37,16 +131,16 @@ export default function ComponentGalleryScreen() {
   ];
 
   const runsheetTabs = [
-    { id: 'tous', label: 'Tous', count: 48 },
-    { id: 'en_livraison', label: 'En livraison', count: 18 },
-    { id: 'livres', label: 'Livrés', count: 24 },
-    { id: 'reportes', label: 'Reportés', count: 3 },
+    { id: 'tous', label: 'Tous', count: stats?.totalParcels ?? 48 },
+    { id: 'en_livraison', label: 'En livraison', count: stats?.inTransit ?? 18 },
+    { id: 'livres', label: 'Livrés', count: stats?.delivered ?? 24 },
+    { id: 'reportes', label: 'Reportés', count: stats?.reported ?? 3 },
   ];
 
   return (
     <Screen
       title="Design System"
-      subtitle="RUNEX Driver App • Component Gallery"
+      subtitle="RUNEX Driver App • Component Gallery & Data Layer"
       scrollable
       headerRight={
         <View style={styles.headerRightBadge}>
@@ -57,7 +151,7 @@ export default function ComponentGalleryScreen() {
         <BottomNav
           activeTab={activeTab}
           onTabPress={(tab) => setActiveTab(tab)}
-          badges={{ runsheet: 18, pickup: 4 }}
+          badges={{ runsheet: stats?.inTransit ?? 18, pickup: 4 }}
         />
       }
     >
@@ -88,13 +182,13 @@ export default function ComponentGalleryScreen() {
 
             <View style={styles.heroSpecs}>
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>TONE</Text>
-                <Text style={styles.specValue}>Fast • Sporty • Pro</Text>
+                <Text style={styles.specLabel}>DRIVER ACTIF</Text>
+                <Text style={styles.specValue}>{driver?.fullName || 'HAMZA MABROUK'}</Text>
               </View>
               <View style={styles.specDivider} />
               <View style={styles.specItem}>
-                <Text style={styles.specLabel}>THEME</Text>
-                <Text style={styles.specValue}>Two-Tone Dark/Light</Text>
+                <Text style={styles.specLabel}>MATRICULE</Text>
+                <Text style={styles.specValue}>{driver?.matricule || '6383 TUN 181'}</Text>
               </View>
             </View>
           </View>
@@ -207,7 +301,9 @@ export default function ComponentGalleryScreen() {
 
           <View style={styles.typoRow}>
             <Text style={styles.typoMeta}>statNumber (34px, heavy)</Text>
-            <Text style={[typography.statNumber, { color: colors.primary }]}>1,420 TND</Text>
+            <Text style={[typography.statNumber, { color: colors.primary }]}>
+              {stats ? formatTND(stats.cashCollected) : '1,420.000 TND'}
+            </Text>
           </View>
           <View style={styles.typoDivider} />
 
@@ -217,7 +313,7 @@ export default function ComponentGalleryScreen() {
               Livraison prévue au Centre Urbain Nord, Tunis.
             </Text>
             <Text style={[typography.bodySmall, { color: colors.text.secondary, marginTop: 4 }]}>
-              Client contacté par téléphone • Paiement en espèces à la livraison.
+              Client contacté par téléphone • Montant: 45.500 TND à encaisser.
             </Text>
           </View>
         </View>
@@ -227,39 +323,135 @@ export default function ComponentGalleryScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionCategory}>04. COMPOSANT STATCARD</Text>
-          <Text style={styles.sectionTitle}>Dashboard Grid (6 Compteurs)</Text>
+          <Text style={styles.sectionTitle}>Dashboard Grid (Live Stats from Service)</Text>
         </View>
 
         <View style={styles.statGrid}>
           <View style={styles.statCol}>
-            <StatCard label="Total colis" value={48} variant="total" onPress={() => {}} />
+            <StatCard
+              label="Total colis"
+              value={stats?.totalParcels ?? 0}
+              variant="total"
+              onPress={() => {}}
+            />
           </View>
           <View style={styles.statCol}>
-            <StatCard label="En livraison" value={18} variant="inDelivery" onPress={() => {}} />
+            <StatCard
+              label="En livraison"
+              value={stats?.inTransit ?? 0}
+              variant="inDelivery"
+              onPress={() => {}}
+            />
           </View>
           <View style={styles.statCol}>
-            <StatCard label="Livrés" value={24} variant="delivered" onPress={() => {}} />
+            <StatCard
+              label="Livrés"
+              value={stats?.delivered ?? 0}
+              variant="delivered"
+              onPress={() => {}}
+            />
           </View>
           <View style={styles.statCol}>
-            <StatCard label="Reportés" value={3} variant="postponed" onPress={() => {}} />
+            <StatCard
+              label="Reportés"
+              value={stats?.reported ?? 0}
+              variant="postponed"
+              onPress={() => {}}
+            />
           </View>
           <View style={styles.statCol}>
-            <StatCard label="Retours" value={2} variant="returned" onPress={() => {}} />
+            <StatCard
+              label="Retours"
+              value={stats?.returned ?? 0}
+              variant="returned"
+              onPress={() => {}}
+            />
           </View>
           <View style={styles.statCol}>
-            <StatCard label="Relances" value={1} variant="relanced" onPress={() => {}} />
+            <StatCard
+              label="Relances"
+              value={stats?.relaunches ?? 0}
+              variant="relanced"
+              onPress={() => {}}
+            />
           </View>
         </View>
       </View>
 
-      {/* 5. PILLS & SEGMENTED TABS */}
+      {/* 5. DATA LAYER & 403 PERMISSION TESTING (NEW!) */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionCategory}>05. FILTRES & ONGLETS</Text>
+          <Text style={styles.sectionCategory}>05. COUCHE DE DONNÉES & GESTION DES 403</Text>
+          <Text style={styles.sectionTitle}>Active Runsheet & Permission Simulation</Text>
+        </View>
+
+        {liveError && (
+          <ErrorBanner
+            type="permission"
+            code={liveError.code || `${liveError.status}`}
+            title={`Erreur API [${liveError.status}]`}
+            message={liveError.message}
+            onDismiss={() => setLiveError(null)}
+          />
+        )}
+
+        <View style={styles.dataLayerCard}>
+          <View style={styles.dataHeaderRow}>
+            <View>
+              <Text style={styles.dataTitle}>
+                Feuille de Route: {runsheet?.id || 'Chargement...'}
+              </Text>
+              <Text style={styles.dataSubtitle}>
+                {runsheet?.parcels.length || 0} colis enregistrés • Encaissé:{' '}
+                {formatTND(stats?.cashCollected || 0)}
+              </Text>
+            </View>
+            {dataLoading && <ActivityIndicator color={colors.primary} size="small" />}
+          </View>
+
+          <View style={styles.testActionsRow}>
+            <SecondaryButton
+              title="Tester Livraison"
+              size="sm"
+              iconName="checkmark-circle-outline"
+              fullWidth={false}
+              onPress={handleTestDeliver}
+            />
+            <SecondaryButton
+              title="Tester Report (Simule 403)"
+              size="sm"
+              iconName="time-outline"
+              variant="outline"
+              fullWidth={false}
+              onPress={handleTestPostpone403}
+            />
+            <SecondaryButton
+              title="Colis non-assigné (403)"
+              size="sm"
+              iconName="shield-outline"
+              variant="dark"
+              fullWidth={false}
+              onPress={handleTestUnassigned403}
+            />
+            <SecondaryButton
+              title={simulateEmptyRunsheet ? 'Feuille remplie' : 'Simuler Feuille Vide'}
+              size="sm"
+              iconName="swap-horizontal"
+              fullWidth={false}
+              onPress={() => setSimulateEmptyRunsheet(!simulateEmptyRunsheet)}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* 6. PILLS & SEGMENTED TABS */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionCategory}>06. FILTRES & ONGLETS</Text>
           <Text style={styles.sectionTitle}>SegmentedTabs & Pill</Text>
         </View>
 
-        <Text style={styles.groupSubtitle}>Filtres Pickups (Tous / En cours / Effectués)</Text>
+        <Text style={styles.groupSubtitle}>Filtres Pickups / Ramassages</Text>
         <SegmentedTabs
           tabs={pickupTabs}
           activeTab={activePickupFilter}
@@ -267,9 +459,7 @@ export default function ComponentGalleryScreen() {
           variant="dark"
         />
 
-        <Text style={[styles.groupSubtitle, { marginTop: spacing.lg }]}>
-          Filtres Runsheet (Tous / En livraison / Livrés / Reportés)
-        </Text>
+        <Text style={[styles.groupSubtitle, { marginTop: spacing.lg }]}>Filtres Runsheet</Text>
         <SegmentedTabs
           tabs={runsheetTabs}
           activeTab={activeRunsheetFilter}
@@ -277,9 +467,7 @@ export default function ComponentGalleryScreen() {
           variant="dark"
         />
 
-        <Text style={[styles.groupSubtitle, { marginTop: spacing.lg }]}>
-          Variantes Individuelles Pill
-        </Text>
+        <Text style={[styles.groupSubtitle, { marginTop: spacing.lg }]}>Variantes Pill</Text>
         <View style={styles.pillsRow}>
           <Pill label="Dark Active" active variant="dark" />
           <Pill label="Primary Red" active variant="primary" />
@@ -287,10 +475,10 @@ export default function ComponentGalleryScreen() {
         </View>
       </View>
 
-      {/* 6. STATUS BADGES */}
+      {/* 7. STATUS BADGES */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionCategory}>06. CHIPS DE STATUT</Text>
+          <Text style={styles.sectionCategory}>07. CHIPS DE STATUT</Text>
           <Text style={styles.sectionTitle}>Badges de Statut</Text>
         </View>
 
@@ -308,10 +496,10 @@ export default function ComponentGalleryScreen() {
         </View>
       </View>
 
-      {/* 7. ERROR BANNER (403 PERMISSION & NETWORK) */}
+      {/* 8. ERROR BANNER (403 PERMISSION & NETWORK) */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionCategory}>{'07. GESTION DES ERREURS & 403'}</Text>
+          <Text style={styles.sectionCategory}>{'08. GESTION DES ERREURS & 403'}</Text>
           <Text style={styles.sectionTitle}>ErrorBanner (403 & Network)</Text>
         </View>
 
@@ -332,7 +520,7 @@ export default function ComponentGalleryScreen() {
             title="Connexion réseau perdue"
             message="Impossible de synchroniser les données avec le serveur. Les scans sont sauvegardés localement."
             onRetry={() => {
-              alert('Synchronisation locale en cours...');
+              loadData();
             }}
             onDismiss={() => setShowNetworkBanner(false)}
             actionLabel="Synchroniser"
@@ -346,10 +534,10 @@ export default function ComponentGalleryScreen() {
         />
       </View>
 
-      {/* 8. BUTTONS & ACTIONS */}
+      {/* 9. BUTTONS & ACTIONS */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionCategory}>08. BOUTONS & ACTIONS</Text>
+          <Text style={styles.sectionCategory}>09. BOUTONS & ACTIONS</Text>
           <Text style={styles.sectionTitle}>Buttons (Primary, Secondary, Icon)</Text>
         </View>
 
@@ -394,10 +582,10 @@ export default function ComponentGalleryScreen() {
         </View>
       </View>
 
-      {/* 9. EMPTY STATES */}
+      {/* 10. EMPTY STATES */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionCategory}>09. ÉTATS VIDES</Text>
+          <Text style={styles.sectionCategory}>10. ÉTATS VIDES</Text>
           <Text style={styles.sectionTitle}>EmptyState Component</Text>
         </View>
 
@@ -411,7 +599,7 @@ export default function ComponentGalleryScreen() {
                 iconName="refresh"
                 size="sm"
                 fullWidth={false}
-                onPress={() => {}}
+                onPress={loadData}
               />
             }
           />
@@ -635,6 +823,36 @@ const styles = StyleSheet.create({
     width: '50%',
     paddingHorizontal: spacing.xs,
     marginBottom: spacing.md,
+  },
+  dataLayerCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
+  },
+  dataHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  dataTitle: {
+    ...typography.h3,
+    color: colors.text.primary,
+    fontWeight: '700',
+  },
+  dataSubtitle: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  testActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   pillsRow: {
     flexDirection: 'row',

@@ -1,13 +1,14 @@
 import { create } from 'zustand';
-import { DriverProfile, Parcel, ParcelStatus, Pickup, RunsheetSummary } from '@/types';
-import { driverApi } from '@/services/api';
+import { Driver, Parcel, Ramassage, DashboardStats, Runsheet } from '@/types';
+import { driversService, dashboardService, runsheetsService, ramassagesService } from '@/services';
 
 interface AppState {
   // State
-  profile: DriverProfile | null;
+  profile: Driver | null;
+  activeRunsheet: Runsheet | null;
   parcels: Parcel[];
-  pickups: Pickup[];
-  runsheetSummary: RunsheetSummary;
+  ramassages: Ramassage[];
+  dashboardStats: DashboardStats;
   selectedZone: string | null;
   searchQuery: string;
   isLoading: boolean;
@@ -17,21 +18,25 @@ interface AppState {
   loadInitialData: () => Promise<void>;
   setSelectedZone: (zoneId: string | null) => void;
   setSearchQuery: (query: string) => void;
-  updateParcelStatus: (id: string, status: ParcelStatus) => Promise<void>;
+  deliverParcel: (parcelId: string, notes?: string) => Promise<void>;
+  returnParcel: (parcelId: string, reason: string, notes?: string) => Promise<void>;
+  postponeParcel: (parcelId: string, reason: string) => Promise<void>;
+  confirmRamassage: (ramassageId: string, notes?: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   profile: null,
+  activeRunsheet: null,
   parcels: [],
-  pickups: [],
-  runsheetSummary: {
+  ramassages: [],
+  dashboardStats: {
     totalParcels: 0,
-    inDelivery: 0,
+    inTransit: 0,
     delivered: 0,
-    postponed: 0,
+    reported: 0,
     returned: 0,
-    relanced: 0,
-    cashCollectedTND: 0,
+    relaunches: 0,
+    cashCollected: 0,
   },
   selectedZone: null,
   searchQuery: '',
@@ -41,17 +46,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadInitialData: async () => {
     set({ isLoading: true, error: null });
     try {
-      const [profile, summary, parcels, pickups] = await Promise.all([
-        driverApi.getProfile(),
-        driverApi.getRunsheetSummary(),
-        driverApi.getParcels(),
-        driverApi.getPickups(),
+      const [profile, stats, runsheet, ramassages] = await Promise.all([
+        driversService.getCurrentDriver(),
+        dashboardService.getDashboardStats(),
+        runsheetsService.getActiveRunsheet(),
+        ramassagesService.getRamassages(),
       ]);
+
       set({
         profile,
-        runsheetSummary: summary,
-        parcels,
-        pickups,
+        dashboardStats: stats,
+        activeRunsheet: runsheet,
+        parcels: runsheet.parcels,
+        ramassages,
         isLoading: false,
       });
     } catch (err) {
@@ -70,14 +77,62 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ searchQuery: query });
   },
 
-  updateParcelStatus: async (id: string, status: ParcelStatus) => {
+  deliverParcel: async (parcelId: string, notes?: string) => {
     try {
-      await driverApi.updateParcelStatus(id, status);
+      const updated = await runsheetsService.deliverParcel(parcelId, { notes });
       const { parcels } = get();
-      const updated = parcels.map((p) => (p.id === id ? { ...p, status } : p));
-      set({ parcels: updated });
+      set({
+        parcels: parcels.map((p) => (p.id === parcelId ? updated : p)),
+      });
+      // Refresh stats
+      const stats = await dashboardService.getDashboardStats();
+      set({ dashboardStats: stats });
     } catch (err) {
-      set({ error: err instanceof Error ? err.message : 'Failed to update status' });
+      set({ error: err instanceof Error ? err.message : 'Échec de la livraison' });
+      throw err;
+    }
+  },
+
+  returnParcel: async (parcelId: string, reason: string, notes?: string) => {
+    try {
+      const updated = await runsheetsService.returnParcel(parcelId, { reason, notes });
+      const { parcels } = get();
+      set({
+        parcels: parcels.map((p) => (p.id === parcelId ? updated : p)),
+      });
+      const stats = await dashboardService.getDashboardStats();
+      set({ dashboardStats: stats });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Échec du retour' });
+      throw err;
+    }
+  },
+
+  postponeParcel: async (parcelId: string, reason: string) => {
+    try {
+      const updated = await runsheetsService.postponeParcel(parcelId, { reason });
+      const { parcels } = get();
+      set({
+        parcels: parcels.map((p) => (p.id === parcelId ? updated : p)),
+      });
+      const stats = await dashboardService.getDashboardStats();
+      set({ dashboardStats: stats });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Échec du report' });
+      throw err;
+    }
+  },
+
+  confirmRamassage: async (ramassageId: string, notes?: string) => {
+    try {
+      const updated = await ramassagesService.confirmRamassage(ramassageId, { notes });
+      const { ramassages } = get();
+      set({
+        ramassages: ramassages.map((r) => (r.id === ramassageId ? updated : r)),
+      });
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : 'Échec de confirmation' });
+      throw err;
     }
   },
 }));
