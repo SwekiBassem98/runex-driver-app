@@ -2,6 +2,7 @@ import { DashboardStats } from '@/types';
 import { runsheetsService } from './runsheets.service';
 
 export interface DashboardService {
+  getTodayStats(): Promise<DashboardStats>;
   getDashboardStats(): Promise<DashboardStats>;
 }
 
@@ -56,6 +57,10 @@ class MockDashboardService implements DashboardService {
       relaunches,
       cashCollected: Number(cashCollected.toFixed(3)),
     };
+  }
+
+  async getTodayStats(): Promise<DashboardStats> {
+    return this.getDashboardStats();
   }
 }
 

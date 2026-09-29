@@ -16,6 +16,7 @@ export interface StatCardProps {
   iconBgColor?: string;
   iconColor?: string;
   onPress?: () => void;
+  loading?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -78,6 +79,7 @@ const variantStyles: Record<
  * - Colored soft-bg circle with icon
  * - Metric label (e.g., "Total colis", "En livraison", "Livrés")
  * - Big bold counter (statNumber)
+ * - Built-in skeleton loading state
  */
 export const StatCard: React.FC<StatCardProps> = ({
   label,
@@ -89,6 +91,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   iconBgColor,
   iconColor,
   onPress,
+  loading = false,
   style,
 }) => {
   const config = variantStyles[variant];
@@ -115,7 +118,7 @@ export const StatCard: React.FC<StatCardProps> = ({
     <TouchableOpacity
       activeOpacity={onPress ? 0.75 : 1}
       onPress={onPress}
-      disabled={!onPress}
+      disabled={!onPress || loading}
       style={[styles.card, style]}
     >
       <View style={styles.topRow}>
@@ -125,7 +128,11 @@ export const StatCard: React.FC<StatCardProps> = ({
         </Text>
       </View>
 
-      <Text style={styles.valueNumber}>{value}</Text>
+      {loading ? (
+        <View style={styles.skeletonValue} />
+      ) : (
+        <Text style={styles.valueNumber}>{value}</Text>
+      )}
     </TouchableOpacity>
   );
 };
@@ -163,5 +170,12 @@ const styles = StyleSheet.create({
   valueNumber: {
     ...typography.statNumber,
     color: colors.text.primary,
+  },
+  skeletonValue: {
+    width: 60,
+    height: 32,
+    borderRadius: radii.sm,
+    backgroundColor: '#E5E7EB',
+    opacity: 0.6,
   },
 });
