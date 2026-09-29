@@ -5,6 +5,7 @@ export default function TabsLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="home" />
       <Stack.Screen name="runsheet" />
+      <Stack.Screen name="pickup" />
     </Stack>
   );
 }

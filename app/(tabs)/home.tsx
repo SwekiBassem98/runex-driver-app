@@ -292,6 +292,8 @@ export default function HomeScreen() {
         onTabPress={(tab: BottomNavTab) => {
           if (tab === 'runsheet') {
             router.push('/(tabs)/runsheet');
+          } else if (tab === 'pickup') {
+            router.push('/(tabs)/pickup');
           } else if (tab === 'scanner') {
             router.push('/_dev/components');
           }

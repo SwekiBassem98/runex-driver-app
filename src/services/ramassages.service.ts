@@ -1,14 +1,28 @@
-import { Ramassage, AppApiError } from '@/types';
+import { Ramassage, Pickup, AppApiError } from '@/types';
 
 export interface ConfirmRamassagePayload {
   parcelsCount?: number;
   notes?: string;
 }
 
+export interface ListRamassagesOptions {
+  status?: 'all' | 'pending' | 'confirmed';
+}
+
 export interface RamassagesService {
+  list(options?: ListRamassagesOptions): Promise<Pickup[]>;
+  confirm(ramassageId: string, payload?: ConfirmRamassagePayload): Promise<Pickup>;
+  getById(id: string): Promise<Pickup>;
+
+  // Backwards compatibility methods
   getRamassages(status?: 'all' | 'pending' | 'confirmed'): Promise<Ramassage[]>;
   getRamassageById(id: string): Promise<Ramassage>;
   confirmRamassage(ramassageId: string, payload?: ConfirmRamassagePayload): Promise<Ramassage>;
+
+  // Mock state management (support both populated and empty mock states)
+  setMockState(state: 'populated' | 'empty'): void;
+  getMockState(): 'populated' | 'empty';
+  resetMockData(): void;
 }
 
 const delay = (ms?: number) =>
@@ -71,14 +85,45 @@ const initialRamassages: Ramassage[] = [
 
 class MockRamassagesService implements RamassagesService {
   private inMemoryRamassages: Ramassage[] = [...initialRamassages];
+  private mockState: 'populated' | 'empty' = 'populated';
 
-  async getRamassages(status: 'all' | 'pending' | 'confirmed' = 'all'): Promise<Ramassage[]> {
+  setMockState(state: 'populated' | 'empty'): void {
+    this.mockState = state;
+  }
+
+  getMockState(): 'populated' | 'empty' {
+    return this.mockState;
+  }
+
+  resetMockData(): void {
+    this.mockState = 'populated';
+    this.inMemoryRamassages = [...initialRamassages];
+  }
+
+  async list(options?: ListRamassagesOptions): Promise<Pickup[]> {
     await delay();
 
+    if (this.mockState === 'empty') {
+      return [];
+    }
+
+    const status = options?.status ?? 'all';
     if (status === 'all') {
       return [...this.inMemoryRamassages];
     }
     return this.inMemoryRamassages.filter((r) => r.status === status);
+  }
+
+  async confirm(ramassageId: string, payload?: ConfirmRamassagePayload): Promise<Pickup> {
+    return this.confirmRamassage(ramassageId, payload);
+  }
+
+  async getById(id: string): Promise<Pickup> {
+    return this.getRamassageById(id);
+  }
+
+  async getRamassages(status: 'all' | 'pending' | 'confirmed' = 'all'): Promise<Ramassage[]> {
+    return this.list({ status });
   }
 
   async getRamassageById(id: string): Promise<Ramassage> {
