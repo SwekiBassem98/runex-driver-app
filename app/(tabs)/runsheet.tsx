@@ -219,6 +219,7 @@ export default function RunsheetScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setSearchQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -353,6 +354,7 @@ export default function RunsheetScreen() {
                 <Text style={styles.modalSubtitle}>Zones assignées à votre profil livreur</Text>
               </View>
               <TouchableOpacity
+                activeOpacity={0.75}
                 onPress={() => setZoneModalVisible(false)}
                 style={styles.modalCloseBtn}
               >
@@ -450,6 +452,8 @@ export default function RunsheetScreen() {
             router.push('/(tabs)/scanner');
           } else if (tab === 'retour') {
             router.push('/(tabs)/retour');
+          } else if (tab === 'profil') {
+            router.push('/(tabs)/profile');
           }
         }}
         badges={{
@@ -511,7 +515,7 @@ const styles = StyleSheet.create({
   zonesPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F2B48',
+    backgroundColor: colors.navyPill,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radii.pill,

@@ -28,6 +28,7 @@ export const colors = {
   cardBorder: '#E5E7EB',
   surfaceDark: '#121829', // Dark card alternative for header widgets
   surfaceMuted: '#F9FAFB',
+  navyPill: '#0F2B48', // Navy pill button for header actions
 
   // Typography
   text: {

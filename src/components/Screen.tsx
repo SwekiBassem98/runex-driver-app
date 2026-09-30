@@ -8,6 +8,7 @@ import {
   ViewStyle,
   KeyboardAvoidingView,
   Platform,
+  RefreshControlProps,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +25,8 @@ export interface ScreenProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
   bottomNav?: React.ReactNode;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
+  showsVerticalScrollIndicator?: boolean;
 }
 
 /**
@@ -44,6 +47,8 @@ export const Screen: React.FC<ScreenProps> = ({
   contentContainerStyle,
   style,
   bottomNav,
+  refreshControl,
+  showsVerticalScrollIndicator = false,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -88,7 +93,8 @@ export const Screen: React.FC<ScreenProps> = ({
               !bottomNav && { paddingBottom: Math.max(insets.bottom, spacing.xl) },
               contentContainerStyle,
             ]}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={showsVerticalScrollIndicator}
+            refreshControl={refreshControl}
           >
             {children}
           </ScrollView>

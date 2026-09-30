@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.status.success,
   },
   onlineText: {
-    color: '#86EFAC',
+    color: colors.cash.green,
     fontSize: 11,
     fontWeight: '700',
   },

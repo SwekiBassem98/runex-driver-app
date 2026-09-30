@@ -285,6 +285,7 @@ export default function PickupScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setSearchQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -479,6 +480,7 @@ export default function PickupScreen() {
                   </View>
 
                   <TouchableOpacity
+                    activeOpacity={0.75}
                     onPress={() => setSelectedPickup(null)}
                     style={styles.closeButton}
                   >
@@ -638,7 +640,7 @@ export default function PickupScreen() {
           <View style={styles.menuCard}>
             <View style={styles.menuHeader}>
               <Text style={styles.menuTitle}>Options & Données Mock</Text>
-              <TouchableOpacity onPress={() => setMenuModalVisible(false)}>
+              <TouchableOpacity activeOpacity={0.75} onPress={() => setMenuModalVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
@@ -738,6 +740,8 @@ export default function PickupScreen() {
             router.push('/(tabs)/scanner');
           } else if (tab === 'retour') {
             router.push('/(tabs)/retour');
+          } else if (tab === 'profil') {
+            router.push('/(tabs)/profile');
           }
         }}
         badges={{

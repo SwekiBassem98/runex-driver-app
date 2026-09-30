@@ -298,6 +298,8 @@ export default function HomeScreen() {
             router.push('/(tabs)/scanner');
           } else if (tab === 'retour') {
             router.push('/(tabs)/retour');
+          } else if (tab === 'profil') {
+            router.push('/(tabs)/profile');
           }
         }}
         badges={{ runsheet: stats.inTransit, retour: stats.returned }}
@@ -309,7 +311,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0A0A',
+    backgroundColor: colors.primaryDark,
   },
   scrollView: {
     flex: 1,

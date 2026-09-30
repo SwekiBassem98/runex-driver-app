@@ -361,7 +361,7 @@ export default function ParcelDetailScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Motif de Retour</Text>
-              <TouchableOpacity onPress={() => setReturnModalVisible(false)}>
+              <TouchableOpacity activeOpacity={0.75} onPress={() => setReturnModalVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
@@ -437,7 +437,7 @@ export default function ParcelDetailScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reporter la livraison</Text>
-              <TouchableOpacity onPress={() => setPostponeModalVisible(false)}>
+              <TouchableOpacity activeOpacity={0.75} onPress={() => setPostponeModalVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
@@ -498,7 +498,7 @@ export default function ParcelDetailScreen() {
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Livraison partielle</Text>
-              <TouchableOpacity onPress={() => setPartialModalVisible(false)}>
+              <TouchableOpacity activeOpacity={0.75} onPress={() => setPartialModalVisible(false)}>
                 <Ionicons name="close" size={22} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>

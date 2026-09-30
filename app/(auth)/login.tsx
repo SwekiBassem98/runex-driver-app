@@ -164,6 +164,7 @@ export default function LoginScreen() {
                 />
                 {identifier.length > 0 && !loading && (
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={() => setIdentifier('')}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >

@@ -247,6 +247,7 @@ export default function ScannerScreen() {
                   <Ionicons name="alert-circle" size={20} color={colors.text.inverse} />
                   <Text style={styles.inlineToastText}>{errorMessage}</Text>
                   <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={() => setErrorMessage(null)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
@@ -304,7 +305,7 @@ export default function ScannerScreen() {
                 <Ionicons
                   name={torchEnabled ? 'flash' : 'flash-outline'}
                   size={18}
-                  color={torchEnabled ? '#F59E0B' : colors.text.inverse}
+                  color={torchEnabled ? colors.status.warning : colors.text.inverse}
                 />
                 <Text style={[styles.pillButtonText, torchEnabled && styles.pillButtonTextActive]}>
                   {torchEnabled ? 'Flash ON' : 'Flash OFF'}
@@ -352,6 +353,7 @@ export default function ScannerScreen() {
                 <Text style={styles.modalSubtitle}>Entrez le code du colis de votre tournée</Text>
               </View>
               <TouchableOpacity
+                activeOpacity={0.75}
                 onPress={() => setManualModalVisible(false)}
                 style={styles.modalCloseBtn}
               >
@@ -379,7 +381,7 @@ export default function ScannerScreen() {
                 onSubmitEditing={handleManualSubmit}
               />
               {manualCode.length > 0 && (
-                <TouchableOpacity onPress={() => setManualCode('')}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => setManualCode('')}>
                   <Ionicons name="close-circle" size={18} color={colors.text.muted} />
                 </TouchableOpacity>
               )}
@@ -429,6 +431,8 @@ export default function ScannerScreen() {
             router.push('/(tabs)/pickup');
           } else if (tab === 'retour') {
             router.push('/(tabs)/retour');
+          } else if (tab === 'profil') {
+            router.push('/(tabs)/profile');
           }
         }}
         badges={{
@@ -443,17 +447,17 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0A0E1A',
+    backgroundColor: colors.background.header,
   },
 
   // Camera viewport
   cameraWrapper: {
     flex: 1,
-    backgroundColor: '#0A0E1A',
+    backgroundColor: colors.background.header,
     position: 'relative',
   },
   cameraPlaceholderBackground: {
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surfaceDark,
   },
 
   // Overlay container over camera feed
@@ -515,7 +519,7 @@ const styles = StyleSheet.create({
   inlineToast: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DC2626',
+    backgroundColor: colors.status.danger,
     borderRadius: radii.card,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
@@ -646,7 +650,7 @@ const styles = StyleSheet.create({
   },
   pillButtonFlashActive: {
     backgroundColor: 'rgba(245, 158, 11, 0.2)',
-    borderColor: '#F59E0B',
+    borderColor: colors.status.warning,
   },
   pillButtonText: {
     color: colors.text.inverse,
@@ -654,7 +658,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   pillButtonTextActive: {
-    color: '#F59E0B',
+    color: colors.status.warning,
   },
 
   // Permission Request View
@@ -663,7 +667,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
-    backgroundColor: '#0A0E1A',
+    backgroundColor: colors.background.header,
   },
   permissionIconCircle: {
     width: 90,

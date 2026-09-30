@@ -4,31 +4,31 @@
     "slug": "runex-driver",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo/runex-logo.png",
     "scheme": "runex-driver",
     "userInterfaceStyle": "light",
     "splash": {
-      "backgroundColor": "#ffffff",
-      "resizeMode": "contain"
+      "image": "./assets/logo/runex-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
     },
     "androidStatusBar": {
-      "barStyle": "dark-content",
-      "backgroundColor": "#ffffff"
+      "barStyle": "light-content",
+      "backgroundColor": "#0A0E1A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/logo/runex-logo.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0C1829",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/logo/runex-logo.png",
+        "backgroundColor": "#0A0A0A"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png",
+      "favicon": "./assets/logo/runex-logo.png",
       "bundler": "metro"
     },
     "plugins": ["expo-router", "expo-status-bar", "expo-font"]

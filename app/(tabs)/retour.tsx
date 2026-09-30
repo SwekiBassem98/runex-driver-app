@@ -143,6 +143,7 @@ export default function RetourScreen() {
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
+              activeOpacity={0.7}
               onPress={() => setSearchQuery('')}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
@@ -243,6 +244,8 @@ export default function RetourScreen() {
             router.push('/(tabs)/pickup');
           } else if (tab === 'scanner') {
             router.push('/(tabs)/scanner');
+          } else if (tab === 'profil') {
+            router.push('/(tabs)/profile');
           }
         }}
         badges={{
@@ -304,7 +307,7 @@ const styles = StyleSheet.create({
   runsheetPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F2B48',
+    backgroundColor: colors.navyPill,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radii.pill,
