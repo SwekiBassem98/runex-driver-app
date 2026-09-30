@@ -8,6 +8,7 @@ export default function TabsLayout() {
       <Stack.Screen name="pickup" />
       <Stack.Screen name="scanner" />
       <Stack.Screen name="retour" />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }

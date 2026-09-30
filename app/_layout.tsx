@@ -8,8 +8,10 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
+        <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="runsheet/[id]" />
+        <Stack.Screen name="profile/zones" />
         <Stack.Screen name="_dev/components" />
       </Stack>
     </>
