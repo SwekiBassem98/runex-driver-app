@@ -574,7 +574,7 @@ export default function RunsheetScreen() {
           } else if (tab === 'pickup') {
             router.push('/(tabs)/pickup');
           } else if (tab === 'scanner') {
-            router.push('/_dev/components');
+            router.push('/(tabs)/scanner');
           }
         }}
         badges={{

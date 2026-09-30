@@ -735,7 +735,7 @@ export default function PickupScreen() {
           } else if (tab === 'runsheet') {
             router.push('/(tabs)/runsheet');
           } else if (tab === 'scanner') {
-            router.push('/_dev/components');
+            router.push('/(tabs)/scanner');
           }
         }}
         badges={{

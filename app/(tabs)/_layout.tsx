@@ -6,6 +6,7 @@ export default function TabsLayout() {
       <Stack.Screen name="home" />
       <Stack.Screen name="runsheet" />
       <Stack.Screen name="pickup" />
+      <Stack.Screen name="scanner" />
     </Stack>
   );
 }
