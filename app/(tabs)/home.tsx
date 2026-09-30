@@ -296,9 +296,11 @@ export default function HomeScreen() {
             router.push('/(tabs)/pickup');
           } else if (tab === 'scanner') {
             router.push('/(tabs)/scanner');
+          } else if (tab === 'retour') {
+            router.push('/(tabs)/retour');
           }
         }}
-        badges={{ runsheet: stats.inTransit }}
+        badges={{ runsheet: stats.inTransit, retour: stats.returned }}
       />
     </View>
   );

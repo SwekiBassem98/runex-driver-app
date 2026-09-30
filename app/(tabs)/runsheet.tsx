@@ -17,23 +17,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
 import {
   SegmentedTabs,
-  Badge,
-  BadgeStatus,
   EmptyState,
   BottomNav,
   BottomNavTab,
   SecondaryButton,
+  ParcelListItem,
 } from '@/components';
-import { runsheetsService } from '@/services/runsheets.service';
+import { useActiveRunsheet } from '@/hooks';
 import { driversService } from '@/services/drivers.service';
-import { ParcelStatus, Runsheet, Zone, formatTND } from '@/types';
+import { Zone } from '@/types';
 import { useUiStore } from '@/store/ui.store';
 
 /**
  * RUNEX Driver Active Runsheet Screen (Tournée)
  * Route: /app/(tabs)/runsheet.tsx
  *
- * Fetches active runsheet once on mount, preserves the full Runsheet object in state,
+ * Uses useActiveRunsheet() hook, preserves the full Runsheet object in state,
  * and performs all filtering and searching client-side in-memory.
  */
 export default function RunsheetScreen() {
@@ -41,49 +40,20 @@ export default function RunsheetScreen() {
   const insets = useSafeAreaInsets();
   const { activeStatusFilter, setActiveStatusFilter } = useUiStore();
 
-  // Full Active Runsheet object preserved in screen state
-  const [activeRunsheet, setActiveRunsheet] = useState<Runsheet | null>(null);
-  const [noActiveRunsheet, setNoActiveRunsheet] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // Shared active runsheet hook
+  const {
+    parcels: allParcels,
+    loading,
+    refreshing,
+    noActiveRunsheet,
+    refresh: onRefresh,
+  } = useActiveRunsheet();
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [zoneModalVisible, setZoneModalVisible] = useState(false);
-
-  // Fetch active runsheet once on mount
-  useEffect(() => {
-    let isMounted = true;
-    runsheetsService
-      .getActiveRunsheet()
-      .then((data) => {
-        if (!isMounted) return;
-        if (!data || data.status !== 'active') {
-          setNoActiveRunsheet(true);
-          setActiveRunsheet(null);
-        } else {
-          setActiveRunsheet(data);
-          setNoActiveRunsheet(false);
-        }
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setNoActiveRunsheet(true);
-        setActiveRunsheet(null);
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoading(false);
-          setRefreshing(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   // Fetch zones from driver profile
   useEffect(() => {
@@ -92,31 +62,6 @@ export default function RunsheetScreen() {
       .then((zones) => setAvailableZones(zones))
       .catch(() => {});
   }, []);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    runsheetsService
-      .getActiveRunsheet()
-      .then((data) => {
-        if (!data || data.status !== 'active') {
-          setNoActiveRunsheet(true);
-          setActiveRunsheet(null);
-        } else {
-          setActiveRunsheet(data);
-          setNoActiveRunsheet(false);
-        }
-      })
-      .catch(() => {
-        setNoActiveRunsheet(true);
-        setActiveRunsheet(null);
-      })
-      .finally(() => {
-        setLoading(false);
-        setRefreshing(false);
-      });
-  };
-
-  const allParcels = useMemo(() => activeRunsheet?.parcels || [], [activeRunsheet]);
 
   // Compute live counts per tab from the loaded runsheet
   const tabs = useMemo(
@@ -199,28 +144,6 @@ export default function RunsheetScreen() {
     setActiveStatusFilter('all');
     setSelectedZone(null);
     setSearchQuery('');
-  };
-
-  const getStatusBadge = (status: ParcelStatus): { label: string; badgeStatus: BadgeStatus } => {
-    switch (status) {
-      case 'delivered':
-        return { label: 'Livré', badgeStatus: 'delivered' };
-      case 'in_transit':
-      case 'assigned':
-      case 'pending':
-        return { label: 'En livraison', badgeStatus: 'inDelivery' };
-      case 'postponed':
-        return { label: 'Reporté', badgeStatus: 'postponed' };
-      case 'returned':
-      case 'cancelled':
-        return { label: 'Retour', badgeStatus: 'returned' };
-      case 'partially_delivered':
-        return { label: 'Partiel', badgeStatus: 'warning' };
-      case 'exchanged':
-        return { label: 'Relancé', badgeStatus: 'neutral' };
-      default:
-        return { label: status, badgeStatus: 'info' };
-    }
   };
 
   const parcelCount = allParcels.length;
@@ -393,63 +316,13 @@ export default function RunsheetScreen() {
           />
         ) : (
           /* Case 4: Populated List */
-          filteredParcels.map((parcel) => {
-            const badge = getStatusBadge(parcel.status);
-
-            return (
-              <TouchableOpacity
-                key={parcel.id}
-                activeOpacity={0.8}
-                onPress={() => router.push(`/runsheet/${parcel.id}`)}
-                style={styles.parcelCard}
-              >
-                {/* Top Row: Code, Sequence Order, Status Badge */}
-                <View style={styles.cardHeaderRow}>
-                  <View style={styles.codeGroup}>
-                    <Text style={styles.parcelCode}>{parcel.code}</Text>
-                    {parcel.sequenceOrder && (
-                      <View style={styles.seqPill}>
-                        <Text style={styles.seqPillText}>#{parcel.sequenceOrder}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Badge label={badge.label} status={badge.badgeStatus} dot size="sm" />
-                </View>
-
-                {/* Client Name */}
-                <Text style={styles.clientName} numberOfLines={1}>
-                  {parcel.clientName}
-                </Text>
-
-                {/* Address (Truncated) */}
-                <View style={styles.addressRow}>
-                  <Ionicons
-                    name="location-outline"
-                    size={14}
-                    color={colors.text.secondary}
-                    style={styles.addressIcon}
-                  />
-                  <Text style={styles.addressText} numberOfLines={1}>
-                    {parcel.address}
-                  </Text>
-                </View>
-
-                {/* Bottom Row: Phone & COD Amount */}
-                <View style={styles.cardFooterRow}>
-                  <View style={styles.phoneGroup}>
-                    <Ionicons name="call-outline" size={13} color={colors.text.secondary} />
-                    <Text style={styles.phoneText}>{parcel.clientPhone}</Text>
-                  </View>
-
-                  {parcel.codAmount !== undefined && parcel.codAmount > 0 ? (
-                    <Text style={styles.codAmountText}>{formatTND(parcel.codAmount)}</Text>
-                  ) : (
-                    <Text style={styles.noCodText}>Payé d&apos;avance</Text>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
+          filteredParcels.map((parcel) => (
+            <ParcelListItem
+              key={parcel.id}
+              parcel={parcel}
+              onPress={(p) => router.push(`/runsheet/${p.id}`)}
+            />
+          ))
         )}
       </ScrollView>
 
@@ -575,10 +448,13 @@ export default function RunsheetScreen() {
             router.push('/(tabs)/pickup');
           } else if (tab === 'scanner') {
             router.push('/(tabs)/scanner');
+          } else if (tab === 'retour') {
+            router.push('/(tabs)/retour');
           }
         }}
         badges={{
           runsheet: allParcels.filter((p) => p.status === 'in_transit').length,
+          retour: allParcels.filter((p) => p.status === 'returned').length,
         }}
       />
     </View>

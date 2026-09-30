@@ -427,10 +427,13 @@ export default function ScannerScreen() {
             router.push('/(tabs)/runsheet');
           } else if (tab === 'pickup') {
             router.push('/(tabs)/pickup');
+          } else if (tab === 'retour') {
+            router.push('/(tabs)/retour');
           }
         }}
         badges={{
           runsheet: activeRunsheet?.parcels?.filter((p) => p.status === 'in_transit').length,
+          retour: activeRunsheet?.parcels?.filter((p) => p.status === 'returned').length,
         }}
       />
     </View>

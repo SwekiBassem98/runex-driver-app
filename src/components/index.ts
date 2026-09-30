@@ -6,3 +6,4 @@ export * from './BottomNav';
 export * from './Badge';
 export * from './ErrorBanner';
 export * from './Buttons';
+export * from './ParcelListItem';
