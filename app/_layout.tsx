@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { prepareFeedback } from '@/services/feedback';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
+import { API_CONFIG_ERROR } from '@/config/env';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
@@ -36,6 +37,30 @@ export default function RootLayout() {
     void prepareFeedback();
   }, []);
 
+  // APK mal configuré (adresse du serveur absente ou non sécurisée) : on
+  // l'annonce clairement plutôt que de laisser échouer chaque connexion.
+  if (API_CONFIG_ERROR) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 32,
+          backgroundColor: '#0A0A0A',
+        }}
+      >
+        <StatusBar style="light" />
+        <Text
+          accessibilityRole="alert"
+          style={{ color: '#FFFFFF', fontSize: 16, lineHeight: 24, textAlign: 'center' }}
+        >
+          {API_CONFIG_ERROR}
+        </Text>
+      </View>
+    );
+  }
+
   if (!hydrated || (!fontsLoaded && !fontError)) {
     return (
       <View
@@ -65,7 +90,10 @@ export default function RootLayout() {
           <Stack.Screen name="runsheet/[id]" />
           <Stack.Screen name="profile/zones" />
         </Stack.Protected>
-        <Stack.Screen name="_dev/components" />
+        {/* Galerie de composants : absente des builds de production. */}
+        <Stack.Protected guard={__DEV__}>
+          <Stack.Screen name="_dev/components" />
+        </Stack.Protected>
       </Stack>
     </>
   );
