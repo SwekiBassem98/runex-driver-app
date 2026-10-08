@@ -42,10 +42,11 @@ sur l'émulateur Android, `http://10.0.2.2:4000/api/v1`.
 
 Variables (voir `.env.example`, à copier en `.env.local`) :
 
-| Variable                | Rôle                                               |
-| ----------------------- | -------------------------------------------------- |
-| `EXPO_PUBLIC_API_URL`   | URL de l'API (obligatoire en production, en HTTPS) |
-| `EXPO_PUBLIC_USE_MOCKS` | `true` : données de démonstration, sans API        |
+| Variable                 | Rôle                                                |
+| ------------------------ | --------------------------------------------------- |
+| `EXPO_PUBLIC_API_URL`    | URL de l'API (obligatoire en production, en HTTPS)  |
+| `EXPO_PUBLIC_USE_MOCKS`  | `true` : données de démonstration (dev uniquement)  |
+| `EXPO_PUBLIC_ALLOW_HTTP` | `true` : accepte une API http dans un build de test |
 
 Après un changement de variable : `npx expo start --clear`.
 
@@ -68,7 +69,7 @@ npm run typecheck && npm run lint && npm run format:check
 Test de bout en bout (build web contre l'API réelle seedée, navigateur Chromium) :
 
 ```bash
-EXPO_PUBLIC_API_URL=http://localhost:4000/api/v1 npx expo export --clear --platform web --output-dir dist
+EXPO_PUBLIC_API_URL=http://localhost:4000/api/v1 EXPO_PUBLIC_ALLOW_HTTP=true npx expo export --clear --platform web --output-dir dist
 # servir dist/ (ex. http://localhost:8090) et ajouter cette origine à CORS_ORIGIN de l'API
 APP_URL=http://localhost:8090 API_URL=http://localhost:4000/api/v1 npm run e2e:web
 ```
@@ -77,7 +78,49 @@ Il couvre : sons joués à chaque étape, largeurs 320 / 360 / 430 px, connexion
 scan d'une étiquette de pièce → bonne fiche, livraison enregistrée, refus, ramassage
 (scan, ajout, clôture), session conservée, profil réel.
 
-## Build
+## Générer l'APK du livreur (Android)
 
-Le scanner utilise la caméra (`expo-camera`, permission déclarée dans `app.json`).
-Builds via EAS (`npx eas-cli@latest build`). En production, l'API doit être servie en HTTPS.
+L'APK est compilé par EAS Build (service d'Expo, offre gratuite suffisante) : aucun
+Android Studio n'est nécessaire.
+
+1. **Adresse de l'API** — dans `eas.json`, remplacer
+   `https://REMPLACER-PAR-L-URL-KOYEB.koyeb.app/api/v1` (profils `preview` et `production`)
+   par l'URL publique de l'API, **en HTTPS**, terminée par `/api/v1`.
+   Une version compilée avec l'adresse d'exemple, une adresse `http://` ou sans adresse
+   affiche un message d'erreur au lancement au lieu de l'écran de connexion.
+2. **Compte Expo** (gratuit) : `npx eas-cli@latest login`.
+3. **Premier build** : `npx eas-cli@latest build --platform android --profile preview`.
+   Au premier lancement, accepter la création du projet EAS et laisser EAS **générer et
+   conserver la clé de signature** (keystore). Ne jamais la supprimer : toutes les mises à
+   jour doivent être signées avec la même clé, sinon Android refuse de les installer
+   par-dessus l'ancienne version.
+4. À la fin du build, EAS donne un lien et un QR code : télécharger le fichier `.apk`.
+5. **Installation sur le téléphone du livreur** : envoyer le fichier (WhatsApp, Drive, câble),
+   l'ouvrir, autoriser « Installer des applications inconnues » pour l'application qui l'ouvre,
+   puis Installer. Play Protect peut avertir pour une application hors Play Store :
+   « Plus de détails » → « Installer quand même ».
+6. Le livreur se connecte avec son téléphone, son matricule, son code livreur ou son email,
+   et le mot de passe créé par l'administrateur (Administration → Livreurs sur le web).
+
+### Mettre à jour l'application
+
+- Incrémenter `android.versionCode` dans `app.json` (1 → 2 → 3…) et, si souhaité,
+  `version` (1.0.0 → 1.0.1). Android refuse une mise à jour dont le `versionCode` n'augmente pas.
+- Relancer `npx eas-cli@latest build --platform android --profile preview`, distribuer
+  le nouvel APK : il s'installe par-dessus l'ancien, la session du livreur est conservée.
+- Changement d'adresse de l'API : modifier `eas.json` et recompiler (l'adresse est figée
+  dans l'APK au moment du build).
+
+### Sécurité de la version livrée
+
+- API en HTTPS obligatoire (sinon message d'erreur bloquant) ; `EXPO_PUBLIC_ALLOW_HTTP=true`
+  n'est destiné qu'aux tests locaux.
+- Données de démonstration (`EXPO_PUBLIC_USE_MOCKS`) et galerie `_dev/components`
+  désactivées hors développement.
+- Jetons dans le trousseau chiffré du téléphone (expo-secure-store), sauvegarde Android
+  désactivée (`allowBackup: false`), permissions inutiles bloquées (micro, stockage,
+  superposition). Seule la caméra est demandée, pour le scanner.
+- Une coupure réseau ne déconnecte pas le livreur : seule une session refusée par l'API
+  (expirée après 7 jours sans usage, révoquée, compte désactivé) ramène à la connexion.
+
+Le profil `production` produit un `.aab` pour une future publication sur le Play Store.

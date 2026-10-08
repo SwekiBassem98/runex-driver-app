@@ -47,11 +47,19 @@ apiClient.interceptors.request.use(
  * Un seul renouvellement à la fois : les requêtes parties en même temps
  * attendent le même résultat au lieu d'en lancer chacune un.
  */
-let refreshing: Promise<string | null> | null = null;
+let refreshing: Promise<RefreshResult> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+/**
+ * `rejected` : l'API a refusé le jeton de rafraîchissement (expiré, révoqué,
+ * réutilisé) — la session est finie. `unavailable` : réseau coupé, API en
+ * réveil ou en panne — la session reste, la requête suivante réessaiera.
+ * Un livreur en zone sans réseau ne doit pas se retrouver déconnecté.
+ */
+type RefreshResult = { token: string } | 'rejected' | 'unavailable';
+
+async function refreshAccessToken(): Promise<RefreshResult> {
   const { refreshToken } = useAuthStore.getState();
-  if (!refreshToken) return null;
+  if (!refreshToken) return 'rejected';
   try {
     const res = await axios.post(
       `${API_BASE_URL}/auth/refresh`,
@@ -62,11 +70,12 @@ async function refreshAccessToken(): Promise<string | null> {
       }
     );
     const data = res.data?.data as { accessToken?: string; refreshToken?: string } | undefined;
-    if (!data?.accessToken) return null;
+    if (!data?.accessToken) return 'unavailable';
     useAuthStore.getState().setTokens(data.accessToken, data.refreshToken ?? refreshToken);
-    return data.accessToken;
-  } catch {
-    return null;
+    return { token: data.accessToken };
+  } catch (err) {
+    const status = isAxiosError(err) ? err.response?.status : undefined;
+    return status === 400 || status === 401 || status === 403 ? 'rejected' : 'unavailable';
   }
 }
 
@@ -80,13 +89,14 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && original && !original._retried && !isAuthCall) {
       original._retried = true;
       refreshing = refreshing ?? refreshAccessToken().finally(() => (refreshing = null));
-      const token = await refreshing;
-      if (token) {
-        original.headers.Authorization = `Bearer ${token}`;
+      const result = await refreshing;
+      if (typeof result === 'object') {
+        original.headers.Authorization = `Bearer ${result.token}`;
         return apiClient(original);
       }
-      // Session expirée pour de bon : retour à l'écran de connexion.
-      useAuthStore.getState().logout();
+      // Session refusée par l'API : retour à l'écran de connexion. Si l'API
+      // est seulement injoignable, on garde la session et on remonte l'erreur.
+      if (result === 'rejected') useAuthStore.getState().logout();
     }
     return Promise.reject(normalizeError(error));
   }
