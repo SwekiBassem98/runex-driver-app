@@ -1,6 +1,8 @@
 import { Driver, AppApiError } from '@/types';
 import { mockDriverProfile } from './drivers.service';
 import { useAuthStore } from '@/store/auth.store';
+import { USE_MOCKS } from '@/config/env';
+import { httpAuthService } from './http/auth.http';
 
 export interface LoginPayload {
   identifier: string; // Phone number or matricule (e.g. 27949967 or 6383 TUN 181)
@@ -96,4 +98,4 @@ class MockAuthService implements AuthService {
 }
 
 export const mockAuthService = new MockAuthService();
-export const authService: AuthService = mockAuthService;
+export const authService: AuthService = USE_MOCKS ? mockAuthService : httpAuthService;

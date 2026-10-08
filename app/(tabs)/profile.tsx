@@ -18,6 +18,7 @@ import { BottomNav, BottomNavTab } from '@/components';
 import { driversService } from '@/services/drivers.service';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth.store';
+import { USE_MOCKS } from '@/config/env';
 import { Driver, Zone } from '@/types';
 
 /**
@@ -65,7 +66,8 @@ export default function ProfileScreen() {
         useAuthStore.getState().setDriver(current);
       })
       .catch(() => {
-        if (isMounted && storedDriver) setDriver(storedDriver);
+        const cached = useAuthStore.getState().driver;
+        if (isMounted && cached) setDriver(cached);
       })
       .finally(() => {
         if (isMounted) {
@@ -77,7 +79,9 @@ export default function ProfileScreen() {
     return () => {
       isMounted = false;
     };
-  }, [storedDriver]);
+    // Une seule lecture à l'ouverture : la fiche relue met à jour le store,
+    // qui ne doit pas relancer la lecture (boucle de requêtes).
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -120,11 +124,11 @@ export default function ProfileScreen() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const driverName = driver?.fullName || storedDriver?.fullName || 'HAMZA MABROUK';
-  const driverMatricule = driver?.matricule || storedDriver?.matricule || '6383 TUN 181';
-  const driverPhone = driver?.phone || storedDriver?.phone || '27 949 967';
-  const driverCin = driver?.cin || storedDriver?.cin || '09876543';
-  const driverAgency = driver?.agency || storedDriver?.agency || 'Ben Arous';
+  const driverName = driver?.fullName || storedDriver?.fullName || '—';
+  const driverMatricule = driver?.matricule || storedDriver?.matricule || '—';
+  const driverPhone = driver?.phone || storedDriver?.phone || '—';
+  const driverCin = driver?.cin || storedDriver?.cin || '—';
+  const driverAgency = driver?.agency || storedDriver?.agency || '—';
   const assignedZones: Zone[] = driver?.zones || storedDriver?.zones || [];
 
   return (
@@ -292,19 +296,25 @@ export default function ProfileScreen() {
             {/* ========================================================= */}
             {/* DESIGN SYSTEM & GALLERY SHORTCUT (DEV ACCESSIBILITY)      */}
             {/* ========================================================= */}
-            <View style={styles.sectionWrapper}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => router.push('/_dev/components')}
-                style={styles.devGalleryButton}
-              >
-                <View style={styles.devGalleryLeft}>
-                  <Ionicons name="color-palette-outline" size={18} color={colors.text.secondary} />
-                  <Text style={styles.devGalleryText}>Galerie de composants & Tests 403</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
+            {(USE_MOCKS || __DEV__) && (
+              <View style={styles.sectionWrapper}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/_dev/components')}
+                  style={styles.devGalleryButton}
+                >
+                  <View style={styles.devGalleryLeft}>
+                    <Ionicons
+                      name="color-palette-outline"
+                      size={18}
+                      color={colors.text.secondary}
+                    />
+                    <Text style={styles.devGalleryText}>Galerie de composants & Tests 403</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.text.secondary} />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* ========================================================= */}
             {/* 3. DÉCONNEXION DESTRUCTIVE BUTTON                         */}

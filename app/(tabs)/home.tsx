@@ -93,8 +93,8 @@ export default function HomeScreen() {
     });
   };
 
-  const driverFullName = driver?.fullName || 'HAMZA MABROUK';
-  const driverMatricule = driver?.matricule || '6383 TUN 181';
+  const driverFullName = driver?.fullName || '';
+  const driverMatricule = driver?.matricule || '';
 
   return (
     <View style={styles.container}>

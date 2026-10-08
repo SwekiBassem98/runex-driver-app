@@ -33,7 +33,8 @@ class MockDashboardService implements DashboardService {
         case 'delivered':
         case 'partially_delivered':
           delivered++;
-          cashCollected += p.codAmount || 0;
+          // Montant réellement encaissé (API) ; à défaut, le montant du colis.
+          cashCollected += p.collectedAmount ?? p.codAmount ?? 0;
           break;
         case 'postponed':
           reported++;

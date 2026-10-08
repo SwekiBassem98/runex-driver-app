@@ -27,6 +27,7 @@ import {
   SecondaryButton,
 } from '@/components';
 import { ramassagesService } from '@/services/ramassages.service';
+import { USE_MOCKS } from '@/config/env';
 import { Pickup } from '@/types';
 
 /**
@@ -229,15 +230,17 @@ export default function PickupScreen() {
 
           {/* Top Right Action Icons: Hamburger Menu + Refresh Icon */}
           <View style={styles.headerActions}>
-            {/* Hamburger Menu Icon */}
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setMenuModalVisible(true)}
-              style={styles.headerIconButton}
-              accessibilityLabel="Menu Options"
-            >
-              <Ionicons name="menu-outline" size={22} color={colors.text.inverse} />
-            </TouchableOpacity>
+            {/* Hamburger Menu Icon (données de démonstration uniquement) */}
+            {USE_MOCKS && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setMenuModalVisible(true)}
+                style={styles.headerIconButton}
+                accessibilityLabel="Menu Options"
+              >
+                <Ionicons name="menu-outline" size={22} color={colors.text.inverse} />
+              </TouchableOpacity>
+            )}
 
             {/* Refresh Icon */}
             <TouchableOpacity
@@ -582,16 +585,40 @@ export default function PickupScreen() {
                   <View style={styles.actionForm}>
                     <Text style={styles.formSectionTitle}>Validation de la récupération</Text>
 
-                    {/* Number of parcels input */}
-                    <Text style={styles.inputLabel}>Nombre de colis récupérés</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      keyboardType="number-pad"
-                      value={parcelsCollected}
-                      onChangeText={setParcelsCollected}
-                      placeholder="Ex: 8"
-                      placeholderTextColor={colors.text.muted}
-                    />
+                    {USE_MOCKS ? (
+                      <>
+                        {/* Number of parcels input */}
+                        <Text style={styles.inputLabel}>Nombre de colis récupérés</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          keyboardType="number-pad"
+                          value={parcelsCollected}
+                          onChangeText={setParcelsCollected}
+                          placeholder="Ex: 8"
+                          placeholderTextColor={colors.text.muted}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {/* Les colis collectés sont ceux scannés chez l'expéditeur */}
+                        <Text style={styles.inputLabel}>
+                          Colis scannés : {selectedPickup.pickedCount ?? 0}
+                          {selectedPickup.estimatedCount
+                            ? ` / ${selectedPickup.estimatedCount} annoncés`
+                            : ''}
+                        </Text>
+                        <SecondaryButton
+                          title="Scanner les colis"
+                          iconName="scan-outline"
+                          variant="outline"
+                          onPress={() => {
+                            setSelectedPickup(null);
+                            router.push('/(tabs)/scanner');
+                          }}
+                          style={styles.confirmButton}
+                        />
+                      </>
+                    )}
 
                     {/* Driver notes input */}
                     <Text style={styles.inputLabel}>Observations / Note (optionnel)</Text>

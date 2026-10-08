@@ -18,7 +18,8 @@ import { colors, typography, spacing, radii, shadows } from '@/theme';
 import { BottomNav, BottomNavTab, PrimaryButton, SecondaryButton } from '@/components';
 import { useScanner } from '@/hooks';
 import { runsheetsService } from '@/services/runsheets.service';
-import { Parcel, Runsheet } from '@/types';
+import { scanService, scanErrorMessage } from '@/services/scan.service';
+import { Runsheet, ScanAction, ScanResult, formatTND } from '@/types';
 
 /**
  * RUNEX Driver Barcode Scanner Screen
@@ -29,9 +30,12 @@ import { Parcel, Runsheet } from '@/types';
  * - Full-bleed dark camera view with corner-bracket frame overlay
  * - Permission request state view
  * - Flash ON/OFF and Saisie Manuelle pill buttons
- * - Local runsheet parcel lookup (no separate search endpoint)
- * - Navigation to /runsheet/[id] on success
- * - Inline error toast: "Colis introuvable dans votre tournée" on failure
+ * - Lookup through POST /scan (QR / code-barres du bon de livraison, étiquette
+ *   de pièce « …-2 », numéro de suivi saisi) — le serveur dit quel colis et ce
+ *   que le livreur peut en faire
+ * - Colis de la tournée → fiche du colis (/runsheet/[id]) avec la pièce lue
+ * - Colis à ramasser → fiche courte + « Ajouter au ramassage »
+ * - Refus explicites (illisible, inconnu, non affecté, pièce invalide)
  */
 export default function ScannerScreen() {
   const router = useRouter();
@@ -104,33 +108,67 @@ export default function ScannerScreen() {
     }, 4000);
   }, []);
 
-  // Look up parcel among currently loaded active runsheet's parcels
+  // Résultat d'un scan qui n'ouvre pas directement la fiche (ramassage…)
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [actionRunning, setActionRunning] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
   const handleProcessCode = useCallback(
-    (scannedRaw: string) => {
-      const clean = scannedRaw.trim().toUpperCase();
-      if (!clean) return;
-
-      const parcels: Parcel[] = activeRunsheet?.parcels || [];
-
-      // Find parcel matching code, ID, or normalized alphanumeric code
-      const found = parcels.find(
-        (p) =>
-          p.code.trim().toUpperCase() === clean ||
-          p.id.trim().toUpperCase() === clean ||
-          p.code.replace(/[^A-Za-z0-9]/g, '').toUpperCase() === clean.replace(/[^A-Za-z0-9]/g, '')
-      );
-
-      if (found) {
-        setErrorMessage(null);
+    async (scannedRaw: string) => {
+      const code = scannedRaw.trim();
+      if (!code || processing) return;
+      setProcessing(true);
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      try {
+        const result = await scanService.scan(code);
+        const fromManual = manualModalVisible;
         setManualModalVisible(false);
-        // Navigate directly to the parcel detail screen prefilled
-        router.push(`/runsheet/${found.id}`);
-      } else {
-        // Show inline error toast without leaving scanner
-        showErrorToast(`Colis introuvable dans votre tournée (${scannedRaw})`);
+        setManualCode('');
+        if (result.relation === 'DELIVERY') {
+          const params = result.piece
+            ? `?piece=${result.piece.number}&count=${result.piece.count}`
+            : '';
+          const open = () => router.push(`/runsheet/${result.parcel.id}${params}`);
+          // Laisser la feuille de saisie se refermer avant d'ouvrir la fiche.
+          if (fromManual) setTimeout(open, 350);
+          else open();
+        } else if (fromManual) {
+          // iOS refuse d'ouvrir une feuille pendant la fermeture d'une autre.
+          setTimeout(() => setScanResult(result), 450);
+        } else {
+          setScanResult(result);
+        }
+      } catch (err: unknown) {
+        showErrorToast(scanErrorMessage(err, code));
+      } finally {
+        setProcessing(false);
       }
     },
-    [activeRunsheet, router, showErrorToast]
+    [processing, manualModalVisible, router, showErrorToast]
+  );
+
+  const runScanAction = useCallback(
+    async (action: ScanAction) => {
+      setActionRunning(true);
+      try {
+        await scanService.runAction(action);
+        setSuccessMessage(
+          action.key === 'pickup-attach'
+            ? `Colis ajouté au ramassage ${scanResult?.pickup?.referenceNumber ?? ''}`
+            : action.key === 'pickup-detach'
+              ? 'Colis retiré du ramassage'
+              : 'Action enregistrée'
+        );
+        setScanResult(null);
+      } catch (err: unknown) {
+        showErrorToast((err as { message?: string })?.message || 'Action impossible.');
+      } finally {
+        setActionRunning(false);
+      }
+    },
+    [scanResult, showErrorToast]
   );
 
   // Hook into decoupled useScanner
@@ -194,7 +232,7 @@ export default function ScannerScreen() {
               style={StyleSheet.absoluteFill}
               facing="back"
               enableTorch={torchEnabled}
-              onBarcodeScanned={handleBarcodeScanned}
+              onBarcodeScanned={processing || scanResult ? undefined : handleBarcodeScanned}
               barcodeScannerSettings={{
                 barcodeTypes: [
                   'qr',
@@ -224,7 +262,7 @@ export default function ScannerScreen() {
                 <Text style={styles.headerSubtitle}>
                   {loadingRunsheet
                     ? 'Chargement tournée...'
-                    : activeRunsheet
+                    : activeRunsheet?.status === 'active'
                       ? `Tournée active (${activeRunsheet.parcels.length} colis)`
                       : 'Aucune tournée active'}
                 </Text>
@@ -240,7 +278,19 @@ export default function ScannerScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* INLINE ERROR TOAST: "Colis introuvable dans votre tournée" */}
+            {successMessage && !errorMessage && (
+              <View style={styles.inlineToastContainer}>
+                <View style={[styles.inlineToast, { backgroundColor: colors.status.success }]}>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.text.inverse} />
+                  <Text style={styles.inlineToastText}>{successMessage}</Text>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => setSuccessMessage(null)}>
+                    <Ionicons name="close" size={18} color="rgba(255,255,255,0.8)" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* INLINE ERROR TOAST: refus du scan */}
             {errorMessage && (
               <View style={styles.inlineToastContainer}>
                 <View style={styles.inlineToast}>
@@ -350,7 +400,7 @@ export default function ScannerScreen() {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Saisie manuelle</Text>
-                <Text style={styles.modalSubtitle}>Entrez le code du colis de votre tournée</Text>
+                <Text style={styles.modalSubtitle}>Code-barres ou numéro du bon de livraison</Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.75}
@@ -371,11 +421,12 @@ export default function ScannerScreen() {
               />
               <TextInput
                 style={styles.textInput}
-                placeholder="Ex: RNX-TN-1001"
+                placeholder="Ex: 261008000000012"
                 placeholderTextColor={colors.text.muted}
                 value={manualCode}
                 onChangeText={setManualCode}
                 autoCapitalize="characters"
+                testID="manual-code-input"
                 autoCorrect={false}
                 returnKeyType="search"
                 onSubmitEditing={handleManualSubmit}
@@ -396,10 +447,10 @@ export default function ScannerScreen() {
                     <TouchableOpacity
                       key={p.id}
                       activeOpacity={0.7}
-                      onPress={() => setManualCode(p.code)}
+                      onPress={() => setManualCode(p.barcode ?? p.code)}
                       style={styles.chipItem}
                     >
-                      <Text style={styles.chipText}>{p.code}</Text>
+                      <Text style={styles.chipText}>{p.barcode ?? p.code}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -411,11 +462,93 @@ export default function ScannerScreen() {
               <PrimaryButton
                 title="Valider et ouvrir"
                 iconName="search-outline"
+                loading={processing}
                 onPress={handleManualSubmit}
                 style={styles.modalActionBtn}
               />
             </View>
           </View>
+        </View>
+      </Modal>
+
+      {/* ============================================================== */}
+      {/* 5. RÉSULTAT DU SCAN HORS TOURNÉE (ramassage chez l'expéditeur) */}
+      {/* ============================================================== */}
+      <Modal
+        visible={!!scanResult}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScanResult(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setScanResult(null)}
+          />
+          {scanResult && (
+            <View
+              style={[
+                styles.modalSheet,
+                { paddingBottom: Math.max(insets.bottom + spacing.lg, 24) },
+              ]}
+            >
+              <View style={styles.sheetHandle} />
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>
+                    {scanResult.relation === 'PICKUP' ? 'Colis à ramasser' : 'Colis'}
+                  </Text>
+                  <Text style={styles.modalSubtitle}>
+                    N° {scanResult.parcel.trackingNumber ?? scanResult.parcel.code}
+                    {scanResult.piece
+                      ? ` · pièce ${scanResult.piece.number}/${scanResult.piece.count}`
+                      : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => setScanResult(null)}
+                  style={styles.modalCloseBtn}
+                >
+                  <Ionicons name="close" size={24} color={colors.text.secondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.resultLine}>{scanResult.parcel.shipperName}</Text>
+              <Text style={styles.resultMuted}>
+                Pour {scanResult.parcel.clientName} — {scanResult.parcel.zoneName}
+              </Text>
+              <Text style={styles.resultMuted}>
+                {scanResult.parcel.pieceCount ?? 1} pièce(s) ·{' '}
+                {formatTND(scanResult.parcel.codAmount || 0)}
+                {scanResult.parcel.isFragile ? ' · FRAGILE' : ''}
+              </Text>
+              {scanResult.pickup && (
+                <Text style={styles.resultMuted}>
+                  Ramassage {scanResult.pickup.referenceNumber}
+                  {scanResult.pickup.attached ? ' · déjà ajouté' : ''}
+                </Text>
+              )}
+              <View style={styles.modalActionsRow}>
+                {scanResult.actions.map((a) => (
+                  <PrimaryButton
+                    key={a.key}
+                    title={a.label}
+                    loading={actionRunning}
+                    onPress={() => runScanAction(a)}
+                    style={styles.modalActionBtn}
+                  />
+                ))}
+                {scanResult.actions.length === 0 && (
+                  <SecondaryButton
+                    title="Fermer"
+                    onPress={() => setScanResult(null)}
+                    style={styles.modalActionBtn}
+                  />
+                )}
+              </View>
+            </View>
+          )}
         </View>
       </Modal>
 
@@ -445,6 +578,16 @@ export default function ScannerScreen() {
 }
 
 const styles = StyleSheet.create({
+  resultLine: {
+    ...typography.h3,
+    color: colors.text.primary,
+    marginTop: spacing.sm,
+  },
+  resultMuted: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginTop: 4,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background.header,
