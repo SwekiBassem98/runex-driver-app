@@ -126,7 +126,9 @@ export function normalizeError(error: unknown): ApiError {
     let message = data?.message || data?.error || error.message;
 
     if (status === 0 || error.code === 'ERR_NETWORK') {
-      message = 'Impossible de contacter le serveur RUNEX. Vérifiez votre connexion internet.';
+      message = __DEV__
+        ? `Serveur RUNEX injoignable (${API_BASE_URL}). Le téléphone et l'ordinateur doivent être sur le même Wi-Fi, et l'API démarrée.`
+        : 'Impossible de contacter le serveur RUNEX. Vérifiez votre connexion internet.';
     } else if (status === 403) {
       message =
         message ||

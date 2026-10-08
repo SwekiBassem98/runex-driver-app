@@ -10,11 +10,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { EmptyState, BottomNav, BottomNavTab, SecondaryButton, ParcelListItem } from '@/components';
+import { EmptyState, BottomNav, SecondaryButton, ParcelListItem } from '@/components';
 import { useActiveRunsheet } from '@/hooks';
 import { formatTND } from '@/types';
 
@@ -28,6 +29,7 @@ import { formatTND } from '@/types';
  */
 export default function RetourScreen() {
   const router = useRouter();
+  const goToTab = useTabNavigation('retour');
   const insets = useSafeAreaInsets();
 
   // Shared active runsheet hook
@@ -97,7 +99,7 @@ export default function RetourScreen() {
             {/* Quick link to Runsheet */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/runsheet')}
+              onPress={() => goToTab('runsheet')}
               style={styles.runsheetPillBtn}
             >
               <Ionicons name="document-text-outline" size={15} color={colors.text.inverse} />
@@ -200,7 +202,7 @@ export default function RetourScreen() {
                 iconName="document-text-outline"
                 size="sm"
                 fullWidth={false}
-                onPress={() => router.push('/(tabs)/runsheet')}
+                onPress={() => goToTab('runsheet')}
               />
             }
           />
@@ -235,19 +237,7 @@ export default function RetourScreen() {
       {/* Persistent Bottom Navigation with Retour Active */}
       <BottomNav
         activeTab="retour"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'accueil') {
-            router.push('/(tabs)/home');
-          } else if (tab === 'runsheet') {
-            router.push('/(tabs)/runsheet');
-          } else if (tab === 'pickup') {
-            router.push('/(tabs)/pickup');
-          } else if (tab === 'scanner') {
-            router.push('/(tabs)/scanner');
-          } else if (tab === 'profil') {
-            router.push('/(tabs)/profile');
-          }
-        }}
+        onTabPress={goToTab}
         badges={{
           retour: returnedCount,
           runsheet: allParcels.filter((p) => p.status === 'in_transit').length,

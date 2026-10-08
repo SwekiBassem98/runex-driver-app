@@ -6,9 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Platform,
   Linking,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -87,8 +90,26 @@ export default function ParcelDetailScreen() {
     Linking.openURL(`tel:${cleanPhone}`);
   };
 
-  const handleDeliver = async () => {
+  // Confirmation avant d'enregistrer : un appui involontaire encaisserait
+  // le colis et le sortirait de la tournée.
+  const handleDeliver = () => {
     if (!parcel || actionLoading) return;
+    if (Platform.OS === 'web') {
+      void doDeliver();
+      return;
+    }
+    Alert.alert(
+      'Confirmer la livraison',
+      `Colis ${parcel.code} remis à ${parcel.clientName}.\nMontant encaissé : ${formatTND(parcel.codAmount || 0)}`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer', onPress: () => void doDeliver() },
+      ]
+    );
+  };
+
+  const doDeliver = async () => {
+    if (!parcel) return;
     setActionLoading('deliver');
     setError(null);
     try {
@@ -415,7 +436,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setReturnModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Motif de Retour</Text>
@@ -479,7 +500,7 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================= */}
@@ -491,7 +512,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPostponeModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reporter la livraison</Text>
@@ -540,7 +561,7 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================= */}
@@ -552,7 +573,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPartialModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Livraison partielle</Text>
@@ -609,7 +630,7 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

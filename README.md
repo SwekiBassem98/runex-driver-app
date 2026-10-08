@@ -45,6 +45,14 @@ Après un changement de variable : `npx expo start --clear`.
 
 Comptes de test (base seedée) : `50123456` / `Liv123!` (Hamza), `LIV-SOU-002` / `Liv123!`.
 
+### Dépannage sur téléphone
+
+- **« Serveur RUNEX injoignable (http://…:4000/api/v1) »** : le téléphone et le Mac
+  doivent être sur le même Wi-Fi, l'API démarrée ; au premier lancement, macOS peut
+  demander d'autoriser les connexions entrantes pour Node — accepter. L'adresse visée
+  est affichée sous le bouton « Se connecter » en développement.
+- Après un changement de branche ou de variable : `npx expo start --clear`.
+
 ## Vérifications
 
 ```bash

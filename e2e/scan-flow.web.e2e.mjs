@@ -165,14 +165,51 @@ async function typeInto(selector, value) {
   await page.keyboard.type(value);
 }
 
+console.log('\n0. Accès sans session');
+await page.goto(`${APP}/runsheet/abc`, { waitUntil: 'networkidle2' });
+ok(await waitText(/Téléphone ou Matricule/), 'lien profond sans session → écran de connexion');
+await page.goto(`${APP}/home`, { waitUntil: 'networkidle2' });
+ok(
+  (await waitText(/Téléphone ou Matricule/)) && !(await bodyText()).includes('Test démo'),
+  '/home sans session → connexion ; pas de bandeau « Test démo » hors démonstration'
+);
+
 console.log('\n1. Connexion');
 await page.goto(APP, { waitUntil: 'networkidle2' });
 ok(await waitText(/Téléphone ou Matricule/), 'écran de connexion');
-const inputs = await page.$$('input');
-await inputs[0].type('50123456');
-await inputs[1].type('Liv123!');
+// Serveur injoignable : message utile (adresse visée)
+await page.setRequestInterception(true);
+const block = (r) => (r.url().startsWith(API) ? r.abort() : r.continue());
+page.on('request', block);
+await typeInto('[data-testid="login-identifier"]', '50123456');
+await typeInto('[data-testid="login-password"]', 'Liv123!');
+await tap('Se connecter');
+ok(
+  await waitText(/injoignable|Impossible de contacter/),
+  'API injoignable → message avec l’adresse du serveur'
+);
+page.off('request', block);
+await page.setRequestInterception(false);
+// Mauvais mot de passe
+await typeInto('[data-testid="login-password"]', 'faux-mdp');
+await tap('Se connecter');
+ok(await waitText(/incorrect|invalide|Identifiants/i), 'mauvais mot de passe → message d’erreur');
+ok(page.url().endsWith('/login'), 'reste sur la connexion');
+// Saisie au clavier : identifiant, « suivant » vers le mot de passe, « valider »
+await typeInto('[data-testid="login-identifier"]', '50123456');
+await page.keyboard.press('Enter');
+await pause(200);
+ok(
+  await page.evaluate(
+    () => document.activeElement?.getAttribute('data-testid') === 'login-password'
+  ),
+  'Entrée sur l’identifiant → focus sur le mot de passe'
+);
+await typeInto('[data-testid="login-password"]', 'Liv123!');
 await shot('01-login');
-(await tap('Se connecter')) || (await page.keyboard.press('Enter'));
+await page.keyboard.press('Enter');
+if (!(await waitText(/Hamza/)))
+  console.log('   [debug]', (await bodyText()).replace(/\n/g, ' | ').slice(0, 400));
 ok(await waitText(/Hamza/), 'connecté : nom réel du livreur affiché');
 await shot('02-home');
 await quiet('accueil');
@@ -264,11 +301,35 @@ ok(
   'ramassage clôturé (EFFECTUE)'
 );
 
-console.log('\n5. Session et profil');
+console.log('\n5. Navigation, session, déconnexion');
+await page.goto(`${APP}/home`, { waitUntil: 'domcontentloaded' });
+await waitText(/Total colis/);
+const depth0 = await page.evaluate(() => history.length);
+for (const t of ['Runsheet', 'Pickup', 'Retour', 'Profil', 'Runsheet']) {
+  await tap(t);
+  await pause(700);
+}
+const depth1 = await page.evaluate(() => history.length);
+ok(
+  depth1 - depth0 <= 1,
+  'barre du bas : la pile ne grossit pas à chaque onglet',
+  `${depth1 - depth0} entrées`
+);
+await page.goBack();
+ok(await waitText(/Total colis/), 'retour depuis un onglet → accueil');
 await page.reload({ waitUntil: 'domcontentloaded' });
 await page.goto(`${APP}/profile`, { waitUntil: 'domcontentloaded' });
 ok(await waitText(/214 TUN 4512/), 'session conservée au rechargement ; matricule réel au profil');
 await shot('08-profile');
+page.once('dialog', (d) => d.accept());
+await tap('Déconnexion');
+ok(await waitText(/Téléphone ou Matricule/), 'déconnexion → écran de connexion');
+await page.goto(`${APP}/home`, { waitUntil: 'domcontentloaded' });
+ok(await waitText(/Téléphone ou Matricule/), 'après déconnexion, /home renvoie à la connexion');
+const left = await page.evaluate(() =>
+  Object.keys(localStorage).filter((k) => k.startsWith('runex.session'))
+);
+ok(left.length === 0, 'session effacée du stockage');
 ok(errors.length === 0, 'aucune erreur JavaScript', errors.join(' | '));
 
 await browser.close();

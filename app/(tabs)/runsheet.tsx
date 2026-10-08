@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +20,6 @@ import {
   SegmentedTabs,
   EmptyState,
   BottomNav,
-  BottomNavTab,
   SecondaryButton,
   ParcelListItem,
 } from '@/components';
@@ -37,6 +37,7 @@ import { useUiStore } from '@/store/ui.store';
  */
 export default function RunsheetScreen() {
   const router = useRouter();
+  const goToTab = useTabNavigation('runsheet');
   const insets = useSafeAreaInsets();
   const { activeStatusFilter, setActiveStatusFilter } = useUiStore();
 
@@ -443,19 +444,7 @@ export default function RunsheetScreen() {
       {/* Persistent Bottom Navigation with Runsheet Active */}
       <BottomNav
         activeTab="runsheet"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'accueil') {
-            router.push('/(tabs)/home');
-          } else if (tab === 'pickup') {
-            router.push('/(tabs)/pickup');
-          } else if (tab === 'scanner') {
-            router.push('/(tabs)/scanner');
-          } else if (tab === 'retour') {
-            router.push('/(tabs)/retour');
-          } else if (tab === 'profil') {
-            router.push('/(tabs)/profile');
-          }
-        }}
+        onTabPress={goToTab}
         badges={{
           runsheet: allParcels.filter((p) => p.status === 'in_transit').length,
           retour: allParcels.filter((p) => p.status === 'returned').length,

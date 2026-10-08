@@ -8,13 +8,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { BottomNav, BottomNavTab } from '@/components';
+import { BottomNav } from '@/components';
 import { driversService } from '@/services/drivers.service';
 import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth.store';
@@ -34,6 +36,7 @@ import { Driver, Zone } from '@/types';
  */
 export default function ProfileScreen() {
   const router = useRouter();
+  const goToTab = useTabNavigation('profil');
   const insets = useSafeAreaInsets();
 
   const storedDriver = useAuthStore((state) => state.driver);
@@ -88,30 +91,30 @@ export default function ProfileScreen() {
     fetchProfile();
   };
 
+  const doLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await authService.logout();
+    } catch {
+      useAuthStore.getState().logout();
+    } finally {
+      setLoggingOut(false);
+      // La garde de navigation ramène déjà à la connexion ; ceci la rend explicite.
+      router.replace('/login');
+    }
+  };
+
   const handleLogout = () => {
-    Alert.alert(
-      'Déconnexion',
-      'Êtes-vous sûr de vouloir vous déconnecter de votre session RUNEX Driver ?',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Déconnexion',
-          style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
-            try {
-              await authService.logout();
-            } catch {
-              useAuthStore.getState().logout();
-            } finally {
-              setLoggingOut(false);
-              // Return to login screen
-              router.replace('/(auth)/login');
-            }
-          },
-        },
-      ]
-    );
+    const message = 'Êtes-vous sûr de vouloir vous déconnecter de votre session RUNEX Driver ?';
+    // Alert à boutons n'existe pas sur le web (aperçu) : confirmation du navigateur.
+    if (Platform.OS === 'web') {
+      if (window.confirm(message)) void doLogout();
+      return;
+    }
+    Alert.alert('Déconnexion', message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Déconnexion', style: 'destructive', onPress: () => void doLogout() },
+    ]);
   };
 
   // Extract initials for avatar
@@ -344,22 +347,7 @@ export default function ProfileScreen() {
       {/* ============================================================== */}
       {/* 4. PERSISTENT BOTTOM NAVIGATION (Profil Active)                */}
       {/* ============================================================== */}
-      <BottomNav
-        activeTab="profil"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'accueil') {
-            router.push('/(tabs)/home');
-          } else if (tab === 'runsheet') {
-            router.push('/(tabs)/runsheet');
-          } else if (tab === 'pickup') {
-            router.push('/(tabs)/pickup');
-          } else if (tab === 'scanner') {
-            router.push('/(tabs)/scanner');
-          } else if (tab === 'retour') {
-            router.push('/(tabs)/retour');
-          }
-        }}
-      />
+      <BottomNav activeTab="profil" onTabPress={goToTab} />
     </View>
   );
 }

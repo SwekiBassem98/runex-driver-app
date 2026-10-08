@@ -8,14 +8,16 @@ import {
   TextInput,
   Animated,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView } from 'expo-camera';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { BottomNav, BottomNavTab, PrimaryButton, SecondaryButton } from '@/components';
+import { BottomNav, PrimaryButton, SecondaryButton } from '@/components';
 import { useScanner } from '@/hooks';
 import { runsheetsService } from '@/services/runsheets.service';
 import { scanService, scanErrorMessage } from '@/services/scan.service';
@@ -39,6 +41,7 @@ import { Runsheet, ScanAction, ScanResult, formatTND } from '@/types';
  */
 export default function ScannerScreen() {
   const router = useRouter();
+  const goToTab = useTabNavigation('scanner');
   const insets = useSafeAreaInsets();
 
   // Active runsheet state
@@ -56,25 +59,27 @@ export default function ScannerScreen() {
   // Animated laser scan line
   const [laserAnim] = useState(() => new Animated.Value(0));
 
-  // Load driver's active runsheet once on mount
-  useEffect(() => {
-    let isMounted = true;
-    runsheetsService
-      .getActiveRunsheet()
-      .then((data) => {
-        if (isMounted) setActiveRunsheet(data);
-      })
-      .catch(() => {
-        if (isMounted) setActiveRunsheet(null);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingRunsheet(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
+  // Tournée du livreur : au premier affichage puis à chaque retour sur le scanner.
+  const loadRunsheet = useCallback(async () => {
+    try {
+      setActiveRunsheet(await runsheetsService.getActiveRunsheet());
+    } catch {
+      setActiveRunsheet(null);
+    } finally {
+      setLoadingRunsheet(false);
+    }
   }, []);
+
+  // La caméra ne tourne que sur l'écran visible : pas de scan fantôme depuis
+  // un écran resté en dessous (fiche du colis ouverte), pas de batterie perdue.
+  const [isFocused, setIsFocused] = useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      setIsFocused(true);
+      void loadRunsheet();
+      return () => setIsFocused(false);
+    }, [loadRunsheet])
+  );
 
   // Continuous animation for the scan laser line
   useEffect(() => {
@@ -227,7 +232,7 @@ export default function ScannerScreen() {
         /* 2. FULL-BLEED DARK CAMERA VIEW                                 */
         /* ============================================================== */
         <View style={styles.cameraWrapper}>
-          {hasPermission ? (
+          {hasPermission && isFocused ? (
             <CameraView
               style={StyleSheet.absoluteFill}
               facing="back"
@@ -270,7 +275,7 @@ export default function ScannerScreen() {
 
               <TouchableOpacity
                 activeOpacity={0.75}
-                onPress={() => router.push('/(tabs)/runsheet')}
+                onPress={() => goToTab('runsheet')}
                 style={styles.headerRunsheetBtn}
               >
                 <Ionicons name="list-outline" size={18} color={colors.text.inverse} />
@@ -385,7 +390,7 @@ export default function ScannerScreen() {
         animationType="slide"
         onRequestClose={() => setManualModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -468,7 +473,7 @@ export default function ScannerScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ============================================================== */}
@@ -480,7 +485,7 @@ export default function ScannerScreen() {
         animationType="slide"
         onRequestClose={() => setScanResult(null)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -549,25 +554,13 @@ export default function ScannerScreen() {
               </View>
             </View>
           )}
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Persistent Bottom Navigation with Scanner Active */}
       <BottomNav
         activeTab="scanner"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'accueil') {
-            router.push('/(tabs)/home');
-          } else if (tab === 'runsheet') {
-            router.push('/(tabs)/runsheet');
-          } else if (tab === 'pickup') {
-            router.push('/(tabs)/pickup');
-          } else if (tab === 'retour') {
-            router.push('/(tabs)/retour');
-          } else if (tab === 'profil') {
-            router.push('/(tabs)/profile');
-          }
-        }}
+        onTabPress={goToTab}
         badges={{
           runsheet: activeRunsheet?.parcels?.filter((p) => p.status === 'in_transit').length,
           retour: activeRunsheet?.parcels?.filter((p) => p.status === 'returned').length,
