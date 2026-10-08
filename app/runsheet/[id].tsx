@@ -6,9 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Platform,
   Linking,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -32,7 +35,13 @@ import { Parcel, ParcelStatus, ApiError, formatTND } from '@/types';
 export default function ParcelDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, piece, count } = useLocalSearchParams<{
+    id: string;
+    piece?: string;
+    count?: string;
+  }>();
+  // Pièce lue sur le bon de livraison (scan d'une étiquette « …-2 »).
+  const scannedPiece = piece ? { number: Number(piece), count: Number(count) || undefined } : null;
 
   const [parcel, setParcel] = useState<Parcel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +57,7 @@ export default function ParcelDetailScreen() {
 
   const [partialModalVisible, setPartialModalVisible] = useState(false);
   const [partialQuantity, setPartialQuantity] = useState('1');
+  const [partialAmount, setPartialAmount] = useState('');
   const [partialReason, setPartialReason] = useState('Articles partiels acceptés');
 
   useEffect(() => {
@@ -80,8 +90,26 @@ export default function ParcelDetailScreen() {
     Linking.openURL(`tel:${cleanPhone}`);
   };
 
-  const handleDeliver = async () => {
+  // Confirmation avant d'enregistrer : un appui involontaire encaisserait
+  // le colis et le sortirait de la tournée.
+  const handleDeliver = () => {
     if (!parcel || actionLoading) return;
+    if (Platform.OS === 'web') {
+      void doDeliver();
+      return;
+    }
+    Alert.alert(
+      'Confirmer la livraison',
+      `Colis ${parcel.code} remis à ${parcel.clientName}.\nMontant encaissé : ${formatTND(parcel.codAmount || 0)}`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Confirmer', onPress: () => void doDeliver() },
+      ]
+    );
+  };
+
+  const doDeliver = async () => {
+    if (!parcel) return;
     setActionLoading('deliver');
     setError(null);
     try {
@@ -140,6 +168,7 @@ export default function ParcelDetailScreen() {
     try {
       await runsheetsService.partialDelivery(parcel.id, {
         deliveredQuantity: parseInt(partialQuantity, 10) || 1,
+        amountCollected: Number(partialAmount.replace(',', '.')) || 0,
         reason: partialReason.trim(),
       });
       router.back();
@@ -173,6 +202,8 @@ export default function ParcelDetailScreen() {
   };
 
   const is403 = error?.status === 403;
+  // Actions de livraison : seulement sur un colis qui attend encore le livreur.
+  const actionable = !!parcel && (parcel.status === 'in_transit' || parcel.status === 'postponed');
 
   return (
     <View style={styles.container}>
@@ -230,13 +261,52 @@ export default function ParcelDetailScreen() {
                 code={error.code || `${error.status || 'ERR'}`}
                 title={is403 ? 'Autorisation requise' : 'Erreur'}
                 message={
-                  is403
+                  error.message ||
+                  (is403
                     ? 'Cette action nécessite une autorisation supplémentaire — contactez votre gestionnaire.'
-                    : error.message || 'Une erreur est survenue lors du traitement.'
+                    : 'Une erreur est survenue lors du traitement.')
                 }
                 onDismiss={() => setError(null)}
                 style={styles.errorBanner}
               />
+            )}
+
+            {/* Pièce scannée + identité du colis (bon de livraison) */}
+            {(scannedPiece || parcel.trackingNumber) && (
+              <View style={styles.card}>
+                {scannedPiece && (
+                  <View style={styles.pieceBanner} testID="piece-banner">
+                    <Ionicons name="cube-outline" size={18} color={colors.text.inverse} />
+                    <Text style={styles.pieceBannerText}>
+                      Pièce {scannedPiece.number}
+                      {scannedPiece.count ? ` / ${scannedPiece.count}` : ''} scannée
+                    </Text>
+                  </View>
+                )}
+                {parcel.trackingNumber && (
+                  <Text style={styles.factLine}>
+                    N° {parcel.trackingNumber}
+                    {parcel.pieceCount ? ` · ${parcel.pieceCount} pièce(s)` : ''}
+                  </Text>
+                )}
+                {parcel.backendStatusLabel && (
+                  <Text style={styles.factMuted}>Statut : {parcel.backendStatusLabel}</Text>
+                )}
+                {parcel.shipperName && (
+                  <Text style={styles.factMuted}>Expéditeur : {parcel.shipperName}</Text>
+                )}
+                {parcel.contentSummary && (
+                  <Text style={styles.factMuted}>Contenu : {parcel.contentSummary}</Text>
+                )}
+                {(parcel.isFragile || parcel.allowOpen) && (
+                  <View style={styles.flagsRow}>
+                    {parcel.isFragile && <Badge label="FRAGILE" status="warning" size="sm" />}
+                    {parcel.allowOpen && (
+                      <Badge label="Ouverture autorisée" status="info" size="sm" />
+                    )}
+                  </View>
+                )}
+              </View>
             )}
 
             {/* Client Information Card */}
@@ -302,48 +372,57 @@ export default function ParcelDetailScreen() {
             </View>
 
             {/* Action Buttons Section */}
-            <View style={styles.actionsSection}>
-              <Text style={styles.actionsTitle}>Actions de Livraison</Text>
+            {!actionable ? (
+              <View style={styles.card}>
+                <Text style={styles.factMuted}>
+                  Aucune action de livraison : ce colis est «{' '}
+                  {parcel.backendStatusLabel ?? getStatusBadge(parcel.status).label} ».
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.actionsSection}>
+                <Text style={styles.actionsTitle}>Actions de Livraison</Text>
 
-              {/* 1. Marquer comme livré */}
-              <PrimaryButton
-                title="Marquer comme livré"
-                iconName="checkmark-circle-outline"
-                loading={actionLoading === 'deliver'}
-                onPress={handleDeliver}
-                style={styles.actionBtn}
-              />
+                {/* 1. Marquer comme livré */}
+                <PrimaryButton
+                  title="Marquer comme livré"
+                  iconName="checkmark-circle-outline"
+                  loading={actionLoading === 'deliver'}
+                  onPress={handleDeliver}
+                  style={styles.actionBtn}
+                />
 
-              {/* 2. Livraison partielle */}
-              <SecondaryButton
-                title="Livraison partielle"
-                iconName="pie-chart-outline"
-                variant="outline"
-                loading={actionLoading === 'partial'}
-                onPress={() => setPartialModalVisible(true)}
-                style={styles.actionBtn}
-              />
+                {/* 2. Livraison partielle */}
+                <SecondaryButton
+                  title="Livraison partielle"
+                  iconName="pie-chart-outline"
+                  variant="outline"
+                  loading={actionLoading === 'partial'}
+                  onPress={() => setPartialModalVisible(true)}
+                  style={styles.actionBtn}
+                />
 
-              {/* 3. Reporter */}
-              <SecondaryButton
-                title="Reporter la livraison"
-                iconName="calendar-outline"
-                variant="outline"
-                loading={actionLoading === 'postpone'}
-                onPress={() => setPostponeModalVisible(true)}
-                style={styles.actionBtn}
-              />
+                {/* 3. Reporter */}
+                <SecondaryButton
+                  title="Reporter la livraison"
+                  iconName="calendar-outline"
+                  variant="outline"
+                  loading={actionLoading === 'postpone'}
+                  onPress={() => setPostponeModalVisible(true)}
+                  style={styles.actionBtn}
+                />
 
-              {/* 4. Retourner */}
-              <SecondaryButton
-                title="Retourner le colis"
-                iconName="arrow-undo-outline"
-                variant="dark"
-                loading={actionLoading === 'return'}
-                onPress={() => setReturnModalVisible(true)}
-                style={styles.actionBtn}
-              />
-            </View>
+                {/* 4. Retourner */}
+                <SecondaryButton
+                  title="Retourner le colis"
+                  iconName="arrow-undo-outline"
+                  variant="dark"
+                  loading={actionLoading === 'return'}
+                  onPress={() => setReturnModalVisible(true)}
+                  style={styles.actionBtn}
+                />
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -357,7 +436,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setReturnModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Motif de Retour</Text>
@@ -421,7 +500,7 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================= */}
@@ -433,7 +512,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPostponeModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Reporter la livraison</Text>
@@ -482,7 +561,7 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ========================================================= */}
@@ -494,7 +573,7 @@ export default function ParcelDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPartialModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Livraison partielle</Text>
@@ -513,6 +592,17 @@ export default function ParcelDetailScreen() {
                 keyboardType="numeric"
                 value={partialQuantity}
                 onChangeText={setPartialQuantity}
+              />
+            </View>
+
+            <View style={styles.partialInputGroup}>
+              <Text style={styles.partialInputLabel}>Montant encaissé (TND) :</Text>
+              <TextInput
+                style={styles.modalInput}
+                keyboardType="decimal-pad"
+                placeholder="0.000"
+                value={partialAmount}
+                onChangeText={setPartialAmount}
               />
             </View>
 
@@ -540,13 +630,43 @@ export default function ParcelDetailScreen() {
               />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  pieceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  pieceBannerText: {
+    ...typography.body,
+    color: colors.text.inverse,
+    fontWeight: '700',
+  },
+  factLine: {
+    ...typography.body,
+    color: colors.text.primary,
+    fontWeight: '700',
+  },
+  factMuted: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  flagsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background.body,

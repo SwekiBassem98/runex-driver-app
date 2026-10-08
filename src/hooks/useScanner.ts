@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { Linking } from 'react-native';
 import { useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 
 export interface UseScannerOptions {
@@ -40,12 +41,18 @@ export function useScanner(options?: UseScannerOptions): UseScannerReturn {
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
+      // Refus définitif : le système n'affiche plus la demande, il faut
+      // passer par les réglages de l'application.
+      if (permission && !permission.granted && !permission.canAskAgain) {
+        await Linking.openSettings();
+        return false;
+      }
       const response = await requestExpoPermission();
       return response.granted;
     } catch {
       return false;
     }
-  }, [requestExpoPermission]);
+  }, [permission, requestExpoPermission]);
 
   const toggleTorch = useCallback(() => {
     setTorchEnabled((prev) => !prev);

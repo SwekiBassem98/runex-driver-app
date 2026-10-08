@@ -4,36 +4,39 @@ import { Platform, TextStyle } from 'react-native';
  * RUNEX Typography Scale
  * Headings: Poppins (geometric, aggressive/sporty, matches logo energy)
  * Body: Inter (clean, high-legibility geometric sans)
+ *
+ * Noms natifs = clés passées à useFonts() dans app/_layout.tsx
+ * (@expo-google-fonts), identiques sur iOS et Android.
  */
 
 export const fontFamilies = {
   heading: Platform.select({
     web: 'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    ios: 'Poppins-Bold',
+    ios: 'Poppins_700Bold',
     android: 'Poppins_700Bold',
     default: 'System',
   }),
   headingSemiBold: Platform.select({
     web: 'Poppins, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    ios: 'Poppins-SemiBold',
+    ios: 'Poppins_600SemiBold',
     android: 'Poppins_600SemiBold',
     default: 'System',
   }),
   body: Platform.select({
     web: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    ios: 'Inter-Regular',
+    ios: 'Inter_400Regular',
     android: 'Inter_400Regular',
     default: 'System',
   }),
   bodyMedium: Platform.select({
     web: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    ios: 'Inter-Medium',
+    ios: 'Inter_500Medium',
     android: 'Inter_500Medium',
     default: 'System',
   }),
   bodySemiBold: Platform.select({
     web: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    ios: 'Inter-SemiBold',
+    ios: 'Inter_600SemiBold',
     android: 'Inter_600SemiBold',
     default: 'System',
   }),

@@ -11,8 +11,11 @@ import {
   ActivityIndicator,
   Linking,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,11 +25,11 @@ import {
   Badge,
   EmptyState,
   BottomNav,
-  BottomNavTab,
   PrimaryButton,
   SecondaryButton,
 } from '@/components';
 import { ramassagesService } from '@/services/ramassages.service';
+import { USE_MOCKS } from '@/config/env';
 import { Pickup } from '@/types';
 
 /**
@@ -42,7 +45,7 @@ import { Pickup } from '@/types';
  * - Data via ramassagesService.list({ status }) with support for both empty and populated mock states.
  */
 export default function PickupScreen() {
-  const router = useRouter();
+  const goToTab = useTabNavigation('pickup');
   const insets = useSafeAreaInsets();
 
   // Pickups data and loading state
@@ -107,6 +110,9 @@ export default function PickupScreen() {
     fetchPickups();
   };
 
+  // Au retour du scanner : compteur de colis scannés à jour.
+  useRefreshOnFocus(fetchPickups);
+
   // Switch between populated and empty mock states (to easily test both states)
   const handleToggleMockState = (targetState: 'populated' | 'empty') => {
     ramassagesService.setMockState(targetState);
@@ -132,9 +138,26 @@ export default function PickupScreen() {
   };
 
   // Confirm pickup action
-  const handleConfirmPickup = async () => {
+  const handleConfirmPickup = () => {
     if (!selectedPickup || confirming) return;
+    // API réelle : seuls les colis scannés sont comptés. Clôturer sans en avoir
+    // scanné un seul est presque toujours un oubli — on demande confirmation.
+    if (!USE_MOCKS && !selectedPickup.pickedCount && Platform.OS !== 'web') {
+      Alert.alert(
+        'Aucun colis scanné',
+        'Aucun colis n’a été scanné pour ce ramassage. Le clôturer quand même ?',
+        [
+          { text: 'Scanner les colis', style: 'cancel', onPress: () => goToTab('scanner') },
+          { text: 'Clôturer', style: 'destructive', onPress: () => void doConfirmPickup() },
+        ]
+      );
+      return;
+    }
+    void doConfirmPickup();
+  };
 
+  const doConfirmPickup = async () => {
+    if (!selectedPickup) return;
     setConfirming(true);
     try {
       const count = parseInt(parcelsCollected, 10);
@@ -150,8 +173,12 @@ export default function PickupScreen() {
         'Ramassage validé',
         `Le ramassage chez ${updated.supplierName} a été marqué comme récupéré.`
       );
-    } catch {
-      Alert.alert('Erreur', 'Impossible de valider ce ramassage. Veuillez réessayer.');
+    } catch (err: unknown) {
+      Alert.alert(
+        'Erreur',
+        (err as { message?: string })?.message ||
+          'Impossible de valider ce ramassage. Veuillez réessayer.'
+      );
     } finally {
       setConfirming(false);
     }
@@ -229,15 +256,17 @@ export default function PickupScreen() {
 
           {/* Top Right Action Icons: Hamburger Menu + Refresh Icon */}
           <View style={styles.headerActions}>
-            {/* Hamburger Menu Icon */}
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setMenuModalVisible(true)}
-              style={styles.headerIconButton}
-              accessibilityLabel="Menu Options"
-            >
-              <Ionicons name="menu-outline" size={22} color={colors.text.inverse} />
-            </TouchableOpacity>
+            {/* Hamburger Menu Icon (données de démonstration uniquement) */}
+            {USE_MOCKS && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setMenuModalVisible(true)}
+                style={styles.headerIconButton}
+                accessibilityLabel="Menu Options"
+              >
+                <Ionicons name="menu-outline" size={22} color={colors.text.inverse} />
+              </TouchableOpacity>
+            )}
 
             {/* Refresh Icon */}
             <TouchableOpacity
@@ -448,7 +477,7 @@ export default function PickupScreen() {
         animationType="slide"
         onRequestClose={() => setSelectedPickup(null)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView behavior="padding" style={styles.modalOverlay}>
           <TouchableOpacity
             style={styles.modalBackdrop}
             activeOpacity={1}
@@ -582,16 +611,40 @@ export default function PickupScreen() {
                   <View style={styles.actionForm}>
                     <Text style={styles.formSectionTitle}>Validation de la récupération</Text>
 
-                    {/* Number of parcels input */}
-                    <Text style={styles.inputLabel}>Nombre de colis récupérés</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      keyboardType="number-pad"
-                      value={parcelsCollected}
-                      onChangeText={setParcelsCollected}
-                      placeholder="Ex: 8"
-                      placeholderTextColor={colors.text.muted}
-                    />
+                    {USE_MOCKS ? (
+                      <>
+                        {/* Number of parcels input */}
+                        <Text style={styles.inputLabel}>Nombre de colis récupérés</Text>
+                        <TextInput
+                          style={styles.textInput}
+                          keyboardType="number-pad"
+                          value={parcelsCollected}
+                          onChangeText={setParcelsCollected}
+                          placeholder="Ex: 8"
+                          placeholderTextColor={colors.text.muted}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        {/* Les colis collectés sont ceux scannés chez l'expéditeur */}
+                        <Text style={styles.inputLabel}>
+                          Colis scannés : {selectedPickup.pickedCount ?? 0}
+                          {selectedPickup.estimatedCount
+                            ? ` / ${selectedPickup.estimatedCount} annoncés`
+                            : ''}
+                        </Text>
+                        <SecondaryButton
+                          title="Scanner les colis"
+                          iconName="scan-outline"
+                          variant="outline"
+                          onPress={() => {
+                            setSelectedPickup(null);
+                            goToTab('scanner');
+                          }}
+                          style={styles.confirmButton}
+                        />
+                      </>
+                    )}
 
                     {/* Driver notes input */}
                     <Text style={styles.inputLabel}>Observations / Note (optionnel)</Text>
@@ -618,7 +671,7 @@ export default function PickupScreen() {
               </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* ============================================================== */}
@@ -731,19 +784,7 @@ export default function PickupScreen() {
       {/* ============================================================== */}
       <BottomNav
         activeTab="pickup"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'accueil') {
-            router.push('/(tabs)/home');
-          } else if (tab === 'runsheet') {
-            router.push('/(tabs)/runsheet');
-          } else if (tab === 'scanner') {
-            router.push('/(tabs)/scanner');
-          } else if (tab === 'retour') {
-            router.push('/(tabs)/retour');
-          } else if (tab === 'profil') {
-            router.push('/(tabs)/profile');
-          }
-        }}
+        onTabPress={goToTab}
         badges={{
           pickup: pendingCount,
         }}

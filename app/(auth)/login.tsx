@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, gradients, typography, spacing, radii, shadows } from '@/theme';
 import { PrimaryButton, ErrorBanner } from '@/components';
 import { authService } from '@/services/auth.service';
+import { API_BASE_URL, USE_MOCKS } from '@/config/env';
 import { ApiError } from '@/types';
 
 /**
@@ -29,13 +30,15 @@ export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [identifier, setIdentifier] = useState('27949967');
-  const [password, setPassword] = useState('1234');
+  // Valeurs pré-remplies seulement en démonstration (données fictives).
+  const [identifier, setIdentifier] = useState(USE_MOCKS ? '27949967' : '');
+  const [password, setPassword] = useState(USE_MOCKS ? '1234' : '');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   const [focusedInput, setFocusedInput] = useState<'id' | 'pass' | null>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -50,7 +53,7 @@ export default function LoginScreen() {
       });
 
       // Navigate to tabs/home upon success
-      router.replace('/(tabs)/home');
+      router.replace('/home');
     } catch (err: unknown) {
       const apiErr = err as ApiError;
       setError(apiErr);
@@ -83,10 +86,9 @@ export default function LoginScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* « padding » sur les deux plateformes : Android en bord-à-bord ne
+          redimensionne plus la fenêtre, le clavier couvrirait les champs. */}
+      <KeyboardAvoidingView style={styles.keyboardView} behavior="padding">
         <ScrollView
           contentContainerStyle={[
             styles.scrollContent,
@@ -97,6 +99,7 @@ export default function LoginScreen() {
           ]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
         >
           {/* Top RUNEX Logo */}
           <View style={styles.logoSection}>
@@ -149,7 +152,7 @@ export default function LoginScreen() {
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="ex: 27949967 ou 6383 TUN 181"
+                  placeholder="Téléphone, matricule ou email"
                   placeholderTextColor={colors.text.muted}
                   value={identifier}
                   onChangeText={(val) => {
@@ -158,6 +161,13 @@ export default function LoginScreen() {
                   }}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="username"
+                  textContentType="username"
+                  keyboardType="email-address"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  testID="login-identifier"
                   onFocus={() => setFocusedInput('id')}
                   onBlur={() => setFocusedInput(null)}
                   editable={!loading}
@@ -190,6 +200,7 @@ export default function LoginScreen() {
                   style={styles.inputIcon}
                 />
                 <TextInput
+                  ref={passwordRef}
                   style={styles.textInput}
                   placeholder="••••••••"
                   placeholderTextColor={colors.text.muted}
@@ -201,6 +212,9 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  autoComplete="current-password"
+                  textContentType="password"
+                  testID="login-password"
                   onFocus={() => setFocusedInput('pass')}
                   onBlur={() => setFocusedInput(null)}
                   editable={!loading}
@@ -240,14 +254,19 @@ export default function LoginScreen() {
               <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
             </TouchableOpacity>
 
-            {/* Test Helper Notice */}
-            <View style={styles.testHintBox}>
-              <Text style={styles.testHintText}>
-                💡 <Text style={styles.testHintBold}>Test démo :</Text> n&apos;importe quel
-                identifiant se connecte. Tapez <Text style={styles.testHintCode}>0000</Text> pour
-                simuler une erreur 401.
+            {USE_MOCKS ? (
+              <View style={styles.testHintBox}>
+                <Text style={styles.testHintText}>
+                  💡 <Text style={styles.testHintBold}>Test démo :</Text> n&apos;importe quel
+                  identifiant se connecte. Tapez <Text style={styles.testHintCode}>0000</Text> pour
+                  simuler une erreur 401.
+                </Text>
+              </View>
+            ) : __DEV__ ? (
+              <Text style={styles.apiHint} selectable>
+                Serveur : {API_BASE_URL}
               </Text>
-            </View>
+            ) : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -348,7 +367,12 @@ const styles = StyleSheet.create({
   inputContainerFocused: {
     borderColor: colors.primary,
     backgroundColor: colors.surface,
-    ...shadows.subtle,
+  },
+  apiHint: {
+    ...typography.caption,
+    color: colors.text.muted,
+    textAlign: 'center',
+    marginTop: spacing.md,
   },
   inputIcon: {
     marginRight: spacing.sm,

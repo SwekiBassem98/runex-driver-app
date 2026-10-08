@@ -1,5 +1,10 @@
 import { Driver, Zone } from '@/types';
+import { USE_MOCKS } from '@/config/env';
+import { tunisianZones } from './zones';
+import { httpDriversService } from './http/drivers.http';
 import { useAuthStore } from '@/store/auth.store';
+
+export { tunisianZones };
 
 export interface DriversService {
   getCurrentDriver(): Promise<Driver>;
@@ -13,15 +18,6 @@ export interface DriversService {
 
 const delay = (ms?: number) =>
   new Promise((resolve) => setTimeout(resolve, ms ?? 300 + Math.random() * 250));
-
-export const tunisianZones: Zone[] = [
-  { id: 'zone-benarous', name: 'Zone Ben Arous', code: 'BA-01' },
-  { id: 'zone-tunis', name: 'Zone Tunis Centre', code: 'TN-01' },
-  { id: 'zone-nabeul', name: 'Zone Nabeul / Hammamet', code: 'NB-01' },
-  { id: 'zone-sousse', name: 'Zone Sousse Ville', code: 'SS-01' },
-  { id: 'zone-ariana', name: 'Zone Ariana / Ennasr', code: 'AR-01' },
-  { id: 'zone-sfax', name: 'Zone Sfax Centre', code: 'SF-01' },
-];
 
 export const mockDriverProfile: Driver = {
   id: 'drv-7701',
@@ -102,4 +98,4 @@ class MockDriversService implements DriversService {
 }
 
 export const mockDriversService = new MockDriversService();
-export const driversService: DriversService = mockDriversService;
+export const driversService: DriversService = USE_MOCKS ? mockDriversService : httpDriversService;

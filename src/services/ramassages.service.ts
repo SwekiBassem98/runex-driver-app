@@ -1,4 +1,6 @@
 import { Ramassage, Pickup, AppApiError } from '@/types';
+import { USE_MOCKS } from '@/config/env';
+import { httpRamassagesService } from './http/ramassages.http';
 
 export interface ConfirmRamassagePayload {
   parcelsCount?: number;
@@ -167,4 +169,6 @@ class MockRamassagesService implements RamassagesService {
 }
 
 export const mockRamassagesService = new MockRamassagesService();
-export const ramassagesService: RamassagesService = mockRamassagesService;
+export const ramassagesService: RamassagesService = USE_MOCKS
+  ? mockRamassagesService
+  : httpRamassagesService;

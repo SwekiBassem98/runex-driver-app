@@ -10,11 +10,14 @@ import {
 } from '@/types';
 import { useUiStore } from '@/store/ui.store';
 import { useAuthStore } from '@/store/auth.store';
+import { USE_MOCKS } from '@/config/env';
+import { httpRunsheetsService } from './http/runsheets.http';
 
 export interface RunsheetsService {
   getActiveRunsheet(): Promise<Runsheet>;
   getRunsheetById(id: string): Promise<Runsheet>;
   getParcelById(parcelId: string): Promise<Parcel>;
+  startDelivery(parcelId: string): Promise<Parcel>;
   deliverParcel(parcelId: string, payload?: DeliverParcelPayload): Promise<Parcel>;
   returnParcel(parcelId: string, payload: ReturnParcelPayload): Promise<Parcel>;
   postponeParcel(parcelId: string, payload: PostponeParcelPayload): Promise<Parcel>;
@@ -232,6 +235,13 @@ class MockRunsheetsService implements RunsheetsService {
     return { ...parcel };
   }
 
+  async startDelivery(parcelId: string): Promise<Parcel> {
+    await delay(150);
+    const parcel = this.inMemoryParcels.find((p) => p.id === parcelId);
+    if (!parcel) throw new AppApiError(404, 'Colis introuvable.', 'PARCEL_NOT_FOUND');
+    return { ...parcel };
+  }
+
   async deliverParcel(parcelId: string, payload?: DeliverParcelPayload): Promise<Parcel> {
     await delay();
 
@@ -401,4 +411,6 @@ class MockRunsheetsService implements RunsheetsService {
 }
 
 export const mockRunsheetsService = new MockRunsheetsService();
-export const runsheetsService: RunsheetsService = mockRunsheetsService;
+export const runsheetsService: RunsheetsService = USE_MOCKS
+  ? mockRunsheetsService
+  : httpRunsheetsService;

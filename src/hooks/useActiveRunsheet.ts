@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { runsheetsService } from '@/services/runsheets.service';
+import { useRefreshOnFocus } from './useRefreshOnFocus';
 import { Runsheet, Parcel, ApiError } from '@/types';
 
 export interface UseActiveRunsheetReturn {
@@ -89,6 +90,9 @@ export function useActiveRunsheet(): UseActiveRunsheetReturn {
   const refresh = useCallback(async () => {
     await fetchRunsheet(true);
   }, [fetchRunsheet]);
+
+  // Données à jour au retour sur l'écran (colis livré, reporté…).
+  useRefreshOnFocus(() => fetchRunsheet(true));
 
   const parcels = useMemo(() => runsheet?.parcels || [], [runsheet]);
 

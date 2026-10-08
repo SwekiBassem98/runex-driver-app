@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTabNavigation } from '@/hooks/useTabNavigation';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { StatCard, BottomNav, BottomNavTab, ErrorBanner } from '@/components';
+import { StatCard, BottomNav, ErrorBanner } from '@/components';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { dashboardService } from '@/services/dashboard.service';
@@ -31,6 +33,7 @@ import { DashboardStats, ApiError, formatTND } from '@/types';
  */
 export default function HomeScreen() {
   const router = useRouter();
+  const goToTab = useTabNavigation('accueil');
   const insets = useSafeAreaInsets();
   const driver = useAuthStore((state) => state.driver);
   const setActiveStatusFilter = useUiStore((state) => state.setActiveStatusFilter);
@@ -85,6 +88,16 @@ export default function HomeScreen() {
     }
   };
 
+  // Compteurs à jour au retour sur l'accueil.
+  useRefreshOnFocus(async () => {
+    try {
+      setStats(await dashboardService.getTodayStats());
+      setError(null);
+    } catch (err: unknown) {
+      setError(err as ApiError);
+    }
+  });
+
   const handleNavigateToRunsheet = (status: string) => {
     setActiveStatusFilter(status);
     router.push({
@@ -93,8 +106,8 @@ export default function HomeScreen() {
     });
   };
 
-  const driverFullName = driver?.fullName || 'HAMZA MABROUK';
-  const driverMatricule = driver?.matricule || '6383 TUN 181';
+  const driverFullName = driver?.fullName || '';
+  const driverMatricule = driver?.matricule || '';
 
   return (
     <View style={styles.container}>
@@ -289,19 +302,7 @@ export default function HomeScreen() {
       {/* Persistent Bottom Navigation with Accueil Active */}
       <BottomNav
         activeTab="accueil"
-        onTabPress={(tab: BottomNavTab) => {
-          if (tab === 'runsheet') {
-            router.push('/(tabs)/runsheet');
-          } else if (tab === 'pickup') {
-            router.push('/(tabs)/pickup');
-          } else if (tab === 'scanner') {
-            router.push('/(tabs)/scanner');
-          } else if (tab === 'retour') {
-            router.push('/(tabs)/retour');
-          } else if (tab === 'profil') {
-            router.push('/(tabs)/profile');
-          }
-        }}
+        onTabPress={goToTab}
         badges={{ runsheet: stats.inTransit, retour: stats.returned }}
       />
     </View>
