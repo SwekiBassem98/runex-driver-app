@@ -20,6 +20,12 @@ Elle travaille sur l'API RUNEX réelle ; un mode démonstration reste disponible
 - **Profil** : identité, agence et matricule réels (`GET /drivers/me`). Les zones restent une
   préférence locale tant que la plateforme ne les gère pas.
 
+- **Sons et vibrations** (`src/services/feedback.ts`, expo-audio + expo-haptics) : bip au
+  scan, son de réussite, arpège pour « Livré » et « Ramassage clôturé », double son grave
+  au refus. Joués même en mode silencieux (iOS), mélangés à la musique ou au GPS en cours.
+  Les mêmes sons que la plateforme web (`assets/sounds`). Réglage dans Profil → Sons et
+  vibrations (son, volume, vibration, essai).
+
 Contrat de l'API : `docs/MOBILE-SCAN.md` dans le dépôt `runex-platforme`.
 
 ## Lancer en développement
@@ -67,7 +73,7 @@ EXPO_PUBLIC_API_URL=http://localhost:4000/api/v1 npx expo export --clear --platf
 APP_URL=http://localhost:8090 API_URL=http://localhost:4000/api/v1 npm run e2e:web
 ```
 
-Il couvre : connexion par téléphone, absence de requêtes en boucle sur chaque écran,
+Il couvre : sons joués à chaque étape, largeurs 320 / 360 / 430 px, connexion par téléphone, absence de requêtes en boucle sur chaque écran,
 scan d'une étiquette de pièce → bonne fiche, livraison enregistrée, refus, ramassage
 (scan, ajout, clôture), session conservée, profil réel.
 

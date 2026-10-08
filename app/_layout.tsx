@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { prepareFeedback } from '@/services/feedback';
 import { ActivityIndicator, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -31,6 +32,8 @@ export default function RootLayout() {
 
   useEffect(() => {
     void useAuthStore.getState().hydrate();
+    // Sons préchargés dès le démarrage : premier scan sans latence.
+    void prepareFeedback();
   }, []);
 
   if (!hydrated || (!fontsLoaded && !fontError)) {

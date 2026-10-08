@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { FeedbackSettingsCard } from '@/components/FeedbackSettingsCard';
 import {
   StyleSheet,
   View,
@@ -294,6 +295,12 @@ export default function ProfileScreen() {
                   </View>
                 </View>
               </View>
+            </View>
+
+            {/* Sons et vibrations */}
+            <View style={styles.sectionWrapper}>
+              <Text style={styles.sectionTitle}>Sons et vibrations</Text>
+              <FeedbackSettingsCard />
             </View>
 
             {/* ========================================================= */}

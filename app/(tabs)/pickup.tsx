@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { feedback } from '@/services/feedback';
 import {
   StyleSheet,
   View,
@@ -143,6 +144,7 @@ export default function PickupScreen() {
     // API réelle : seuls les colis scannés sont comptés. Clôturer sans en avoir
     // scanné un seul est presque toujours un oubli — on demande confirmation.
     if (!USE_MOCKS && !selectedPickup.pickedCount && Platform.OS !== 'web') {
+      feedback.warning();
       Alert.alert(
         'Aucun colis scanné',
         'Aucun colis n’a été scanné pour ce ramassage. Le clôturer quand même ?',
@@ -169,11 +171,13 @@ export default function PickupScreen() {
       // Update in local state and refresh
       setPickups((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setSelectedPickup(updated);
+      feedback.complete();
       Alert.alert(
         'Ramassage validé',
         `Le ramassage chez ${updated.supplierName} a été marqué comme récupéré.`
       );
     } catch (err: unknown) {
+      feedback.error();
       Alert.alert(
         'Erreur',
         (err as { message?: string })?.message ||

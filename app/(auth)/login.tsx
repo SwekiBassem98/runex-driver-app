@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { feedback } from '@/services/feedback';
 import {
   StyleSheet,
   View,
@@ -52,9 +53,11 @@ export default function LoginScreen() {
         password: password.trim(),
       });
 
+      feedback.success();
       // Navigate to tabs/home upon success
       router.replace('/home');
     } catch (err: unknown) {
+      feedback.error();
       const apiErr = err as ApiError;
       setError(apiErr);
     } finally {

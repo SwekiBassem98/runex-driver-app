@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { feedback } from '@/services/feedback';
 import {
   StyleSheet,
   View,
@@ -128,6 +129,8 @@ export default function ScannerScreen() {
       setSuccessMessage(null);
       try {
         const result = await scanService.scan(code);
+        // Code lu et reconnu : bip de lecteur.
+        feedback.scan();
         const fromManual = manualModalVisible;
         setManualModalVisible(false);
         setManualCode('');
@@ -146,6 +149,7 @@ export default function ScannerScreen() {
           setScanResult(result);
         }
       } catch (err: unknown) {
+        feedback.error();
         showErrorToast(scanErrorMessage(err, code));
       } finally {
         setProcessing(false);
@@ -159,6 +163,8 @@ export default function ScannerScreen() {
       setActionRunning(true);
       try {
         await scanService.runAction(action);
+        if (action.key === 'pickup-detach') feedback.remove();
+        else feedback.success();
         setSuccessMessage(
           action.key === 'pickup-attach'
             ? `Colis ajouté au ramassage ${scanResult?.pickup?.referenceNumber ?? ''}`
@@ -168,6 +174,7 @@ export default function ScannerScreen() {
         );
         setScanResult(null);
       } catch (err: unknown) {
+        feedback.error();
         showErrorToast((err as { message?: string })?.message || 'Action impossible.');
       } finally {
         setActionRunning(false);
