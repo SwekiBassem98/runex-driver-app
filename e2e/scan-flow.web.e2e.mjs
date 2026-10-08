@@ -113,6 +113,23 @@ await page.setViewport({
   hasTouch: true,
 });
 const errors = [];
+// Sons joués, tracés par le service de retour sonore.
+await page.evaluateOnNewDocument(() => {
+  window.__runexSounds = [];
+});
+const played = () => page.evaluate(() => (window.__runexSounds || []).slice());
+const clearSounds = () =>
+  page.evaluate(() => {
+    if (window.__runexSounds) window.__runexSounds.length = 0;
+  });
+const heard = async (kind, timeout = 5000) => {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeout) {
+    if ((await played()).includes(kind)) return true;
+    await pause(150);
+  }
+  return false;
+};
 page.on('pageerror', (e) => errors.push(String(e)));
 let apiCalls = 0;
 page.on('request', (r) => {
@@ -147,6 +164,8 @@ async function tap(text) {
     );
     const el = all[all.length - 1];
     if (!el) return null;
+    // Hors de la barre du bas fixe : sinon le clic tombe sur elle.
+    el.scrollIntoView({ block: 'center' });
     const r = el.getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   }, text);
@@ -194,6 +213,7 @@ await page.setRequestInterception(false);
 await typeInto('[data-testid="login-password"]', 'faux-mdp');
 await tap('Se connecter');
 ok(await waitText(/incorrect|invalide|Identifiants/i), 'mauvais mot de passe → message d’erreur');
+ok(await heard('error'), 'son : connexion refusée → « error »', JSON.stringify(await played()));
 ok(page.url().endsWith('/login'), 'reste sur la connexion');
 // Saisie au clavier : identifiant, « suivant » vers le mot de passe, « valider »
 await typeInto('[data-testid="login-identifier"]', '50123456');
@@ -211,6 +231,7 @@ await page.keyboard.press('Enter');
 if (!(await waitText(/Hamza/)))
   console.log('   [debug]', (await bodyText()).replace(/\n/g, ' | ').slice(0, 400));
 ok(await waitText(/Hamza/), 'connecté : nom réel du livreur affiché');
+ok(await heard('success'), 'son : connexion réussie → « success »');
 await shot('02-home');
 await quiet('accueil');
 ok(
@@ -237,6 +258,7 @@ await typeInto('[data-testid="manual-code-input"]', `${P.barcode}-2`);
 await shot('03-manual');
 await tap('Valider et ouvrir');
 ok(await waitText(/Pièce 2 \/ 2 scannée/), 'fiche ouverte avec « Pièce 2 / 2 scannée »');
+ok(await heard('scan'), 'son : code reconnu → « scan »');
 let t = await bodyText();
 ok(
   t.includes('Client Scan E2E') &&
@@ -247,8 +269,10 @@ ok(
 );
 ok(page.url().includes(`/runsheet/${P.id}`), 'route /runsheet/<id du colis>');
 await shot('04-parcel');
+await clearSounds();
 await tap('Marquer comme livré');
 await pause(1500);
+ok(await heard('complete'), 'son : livré → « complete »', JSON.stringify(await played()));
 const apres = (await api(admin, 'GET', `/colis/${P.id}`)).data;
 ok(
   apres.status === 'LIVRE' && apres.collectedAmount === 43,
@@ -263,6 +287,7 @@ await tap('Saisie manuelle');
 await typeInto('[data-testid="manual-code-input"]', '26010199999999');
 await tap('Valider et ouvrir');
 ok(await waitText(/Colis inconnu/), 'code inconnu → « Colis inconnu »');
+ok(await heard('error'), 'son : refus → « error »');
 if (autre) {
   await tap('Saisie manuelle');
   await typeInto('[data-testid="manual-code-input"]', autre.barcode);
@@ -286,6 +311,7 @@ ok(t.includes(ref) && t.includes('BlueStar'), 'ramassage et expéditeur affiché
 await shot('06-pickup-sheet');
 await tap('Ajouter au ramassage');
 ok(await waitText(/Colis ajouté au ramassage/), 'ajouté au ramassage');
+ok(await heard('success'), 'son : ajout au ramassage → « success »');
 const pk2 = (await api(admin, 'GET', `/ramassages/${ref}`)).data;
 ok(pk2.actualPickedCount === 1, 'API : 1 colis rattaché', String(pk2.actualPickedCount));
 await page.goto(`${APP}/pickup`, { waitUntil: 'networkidle2' });
@@ -294,8 +320,14 @@ await tap('Détails');
 await pause(600);
 ok(await waitText(/Colis scannés : 1/), 'détail : « Colis scannés : 1 / 2 annoncés »');
 await shot('07-pickup-detail');
+await clearSounds();
 await tap('Marquer comme récupéré');
 await pause(1500);
+ok(
+  await heard('complete'),
+  'son : ramassage clôturé → « complete »',
+  JSON.stringify(await played())
+);
 ok(
   (await api(admin, 'GET', `/ramassages/${ref}`)).data.status === 'EFFECTUE',
   'ramassage clôturé (EFFECTUE)'
@@ -321,6 +353,27 @@ await page.reload({ waitUntil: 'domcontentloaded' });
 await page.goto(`${APP}/profile`, { waitUntil: 'domcontentloaded' });
 ok(await waitText(/214 TUN 4512/), 'session conservée au rechargement ; matricule réel au profil');
 await shot('08-profile');
+ok(await waitText(/Sons et vibrations/), 'profil : réglage « Sons et vibrations »');
+await page.$eval('[data-testid="feedback-sound-switch"]', (el) =>
+  el.scrollIntoView({ block: 'center' })
+);
+await page.click('[data-testid="feedback-sound-switch"]');
+await pause(300);
+await clearSounds();
+await tap('Scan');
+await pause(500);
+ok(
+  !(await played()).includes('scan'),
+  'sons coupés → aucun son joué',
+  JSON.stringify(await played())
+);
+await page.$eval('[data-testid="feedback-sound-switch"]', (el) =>
+  el.scrollIntoView({ block: 'center' })
+);
+await page.click('[data-testid="feedback-sound-switch"]');
+await pause(300);
+await tap('Scan');
+ok(await heard('scan'), 'sons réactivés → « scan »');
 page.once('dialog', (d) => d.accept());
 await tap('Déconnexion');
 ok(await waitText(/Téléphone ou Matricule/), 'déconnexion → écran de connexion');
@@ -330,6 +383,61 @@ const left = await page.evaluate(() =>
   Object.keys(localStorage).filter((k) => k.startsWith('runex.session'))
 );
 ok(left.length === 0, 'session effacée du stockage');
+console.log('\n6. Largeurs de téléphone');
+await page.goto(`${APP}/login`, { waitUntil: 'domcontentloaded' });
+await typeInto('[data-testid="login-identifier"]', '50123456');
+await typeInto('[data-testid="login-password"]', 'Liv123!');
+await page.keyboard.press('Enter');
+await waitText(/Total colis/);
+for (const w of [320, 360, 430]) {
+  await page.setViewport({
+    width: w,
+    height: 760,
+    deviceScaleFactor: 1,
+    isMobile: true,
+    hasTouch: true,
+  });
+  for (const route of [
+    'home',
+    'runsheet',
+    'scanner',
+    'pickup',
+    'retour',
+    'profile',
+    `runsheet/${P.id}`,
+  ]) {
+    await page.goto(`${APP}/${route}`, { waitUntil: 'domcontentloaded' });
+    await pause(1200);
+    const over = await page.evaluate(() => {
+      const W = window.innerWidth;
+      const bad = [...document.querySelectorAll('div,span,input')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          if (!r.width || r.right <= W + 1) return false;
+          for (let p = el.parentElement; p; p = p.parentElement) {
+            const s = getComputedStyle(p);
+            if (/(auto|scroll|hidden)/.test(s.overflowX) && p !== document.body) return false;
+          }
+          return true;
+        })
+        .map((el) => (el.innerText || el.tagName).trim().slice(0, 25));
+      return { page: document.documentElement.scrollWidth - W, bad: bad.slice(0, 3) };
+    });
+    ok(
+      over.page <= 1 && over.bad.length === 0,
+      `${route} @${w}px : rien ne dépasse`,
+      JSON.stringify(over)
+    );
+  }
+}
+await page.setViewport({
+  width: 390,
+  height: 844,
+  deviceScaleFactor: 2,
+  isMobile: true,
+  hasTouch: true,
+});
+
 ok(errors.length === 0, 'aucune erreur JavaScript', errors.join(' | '));
 
 await browser.close();

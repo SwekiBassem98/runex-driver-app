@@ -123,7 +123,7 @@ export const StatCard: React.FC<StatCardProps> = ({
     >
       <View style={styles.topRow}>
         <View style={[styles.iconContainer, { backgroundColor: bg }]}>{renderIcon()}</View>
-        <Text style={styles.label} numberOfLines={1}>
+        <Text style={styles.label} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
           {label}
         </Text>
       </View>

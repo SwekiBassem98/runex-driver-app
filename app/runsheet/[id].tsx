@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { feedback } from '@/services/feedback';
 import {
   StyleSheet,
   View,
@@ -117,8 +118,10 @@ export default function ParcelDetailScreen() {
         notes: 'Livraison confirmée par le livreur',
       });
       // Pop back after successful delivery
+      feedback.complete();
       router.back();
     } catch (err: unknown) {
+      feedback.error();
       setError(err as ApiError);
     } finally {
       setActionLoading(null);
@@ -134,8 +137,10 @@ export default function ParcelDetailScreen() {
       await runsheetsService.returnParcel(parcel.id, {
         reason: returnReason.trim(),
       });
+      feedback.remove();
       router.back();
     } catch (err: unknown) {
+      feedback.error();
       setError(err as ApiError);
     } finally {
       setActionLoading(null);
@@ -152,8 +157,10 @@ export default function ParcelDetailScreen() {
         reason: postponeReason.trim(),
         nextDeliveryDate: '2026-09-30',
       });
+      feedback.success();
       router.back();
     } catch (err: unknown) {
+      feedback.error();
       setError(err as ApiError);
     } finally {
       setActionLoading(null);
@@ -171,8 +178,10 @@ export default function ParcelDetailScreen() {
         amountCollected: Number(partialAmount.replace(',', '.')) || 0,
         reason: partialReason.trim(),
       });
+      feedback.success();
       router.back();
     } catch (err: unknown) {
+      feedback.error();
       setError(err as ApiError);
     } finally {
       setActionLoading(null);
