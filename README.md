@@ -26,6 +26,12 @@ Elle travaille sur l'API RUNEX réelle ; un mode démonstration reste disponible
   Les mêmes sons que la plateforme web (`assets/sounds`). Réglage dans Profil → Sons et
   vibrations (son, volume, vibration, essai).
 
+- **Notifications** (`src/services/push.ts`, expo-notifications + Firebase Cloud Messaging) :
+  nouvelle tournée, colis ajouté ou retiré, ramassage affecté… arrivent sur le téléphone
+  avec le son « Alertes RUNEX », même application fermée ou écran verrouillé. Toucher
+  la notification ouvre l'écran concerné. Application ouverte, l'accueil, la tournée et
+  les ramassages se rechargent seuls (notification reçue, retour dans l'application).
+
 Contrat de l'API : `docs/MOBILE-SCAN.md` dans le dépôt `runex-platforme`.
 
 ## Lancer en développement
@@ -88,19 +94,34 @@ Android Studio n'est nécessaire.
    par l'URL publique de l'API, **en HTTPS**, terminée par `/api/v1`.
    Une version compilée avec l'adresse d'exemple, une adresse `http://` ou sans adresse
    affiche un message d'erreur au lancement au lieu de l'écran de connexion.
-2. **Compte Expo** (gratuit) : `npx eas-cli@latest login`.
-3. **Premier build** : `npx eas-cli@latest build --platform android --profile preview`.
+2. **Firebase** (notifications) : `google-services.json` doit être à la racine du projet
+   (console Firebase → application Android `tn.runex.driver` → télécharger). Il est public
+   et se committe. Sans lui, le build échoue. La clé du **compte de service** (autre
+   fichier JSON) va uniquement dans les variables de l'API : voir
+   `docs/DEPLOIEMENT-PRODUCTION.md` § 5.1 dans `runex-platforme`.
+3. **Compte Expo** (gratuit) : `npx eas-cli@latest login`.
+4. **Premier build** : `npx eas-cli@latest build --platform android --profile preview`.
    Au premier lancement, accepter la création du projet EAS et laisser EAS **générer et
    conserver la clé de signature** (keystore). Ne jamais la supprimer : toutes les mises à
    jour doivent être signées avec la même clé, sinon Android refuse de les installer
    par-dessus l'ancienne version.
-4. À la fin du build, EAS donne un lien et un QR code : télécharger le fichier `.apk`.
-5. **Installation sur le téléphone du livreur** : envoyer le fichier (WhatsApp, Drive, câble),
+5. À la fin du build, EAS donne un lien et un QR code : télécharger le fichier `.apk`.
+6. **Installation sur le téléphone du livreur** : envoyer le fichier (WhatsApp, Drive, câble),
    l'ouvrir, autoriser « Installer des applications inconnues » pour l'application qui l'ouvre,
    puis Installer. Play Protect peut avertir pour une application hors Play Store :
    « Plus de détails » → « Installer quand même ».
-6. Le livreur se connecte avec son téléphone, son matricule, son code livreur ou son email,
+7. Le livreur se connecte avec son téléphone, son matricule, son code livreur ou son email,
    et le mot de passe créé par l'administrateur (Administration → Livreurs sur le web).
+
+### Notifications : vérifier sur le téléphone
+
+- À la première connexion, Android demande « Autoriser RUNEX Driver à envoyer des
+  notifications ? » → **Autoriser**. Refusé par erreur : Paramètres → Applications →
+  RUNEX Driver → Notifications → activer.
+- Paramètres → Applications → RUNEX Driver → Notifications → « Alertes RUNEX » : son activé.
+- Xiaomi, Huawei, Oppo, Realme… : Batterie → RUNEX Driver → « Aucune restriction »,
+  sinon les notifications peuvent arriver en retard application fermée.
+- Expo Go ne reçoit pas les notifications poussées (SDK 53+) : tester avec l'APK.
 
 ### Mettre à jour l'application
 

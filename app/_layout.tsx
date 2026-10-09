@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { prepareFeedback } from '@/services/feedback';
+import { registerForPush, startPushListeners } from '@/services/push';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { API_CONFIG_ERROR } from '@/config/env';
 import { Stack } from 'expo-router';
@@ -39,6 +40,14 @@ export default function RootLayout() {
 
   // APK mal configuré (adresse du serveur absente ou non sécurisée) : on
   // l'annonce clairement plutôt que de laisser échouer chaque connexion.
+  // Livreur connecté : notifications poussées (jeton envoyé à l'API à chaque
+  // connexion et à chaque démarrage) et écoutes globales.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    void registerForPush();
+    return startPushListeners();
+  }, [isAuthenticated]);
+
   if (API_CONFIG_ERROR) {
     return (
       <View
