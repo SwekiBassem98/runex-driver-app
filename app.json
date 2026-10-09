@@ -2,32 +2,29 @@
   "expo": {
     "name": "RUNEX Driver",
     "slug": "runex-driver",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/logo/runex-logo.png",
+    "icon": "./assets/brand/icon.png",
     "scheme": "runex-driver",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/logo/runex-logo.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0A"
-    },
     "androidStatusBar": {
       "barStyle": "light-content",
       "backgroundColor": "#0A0E1A"
     },
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/logo/runex-logo.png",
+      "icon": "./assets/brand/icon.png",
       "bundleIdentifier": "tn.runex.driver"
     },
     "android": {
       "package": "tn.runex.driver",
-      "versionCode": 2,
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo/runex-logo.png",
-        "backgroundColor": "#0A0A0A"
+        "foregroundImage": "./assets/brand/adaptive-foreground.png",
+        "backgroundImage": "./assets/brand/adaptive-background.png",
+        "monochromeImage": "./assets/brand/adaptive-monochrome.png",
+        "backgroundColor": "#0E0F12"
       },
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
@@ -47,7 +44,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/logo/runex-logo.png",
+      "favicon": "./assets/brand/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -69,6 +66,15 @@
           "color": "#E31E2B",
           "defaultChannel": "runex-alerts",
           "sounds": ["./assets/sounds/runex_alert.wav"]
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0E0F12",
+          "image": "./assets/brand/splash-mark.png",
+          "imageWidth": 172,
+          "resizeMode": "contain"
         }
       ]
     ],
