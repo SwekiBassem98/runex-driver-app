@@ -65,16 +65,62 @@ export default function LoginScreen() {
     }
   };
 
-  const handleForgotPassword = () => {
-    const title = 'Mot de passe oublié ?';
-    const message =
-      'Veuillez contacter votre superviseur ou votre agence régionale (Ben Arous) pour réinitialiser vos identifiants de tournée.';
+  const [sendingReset, setSendingReset] = useState(false);
 
-    if (Platform.OS === 'web') {
-      window.alert(`${title}\n\n${message}`);
-    } else {
-      Alert.alert(title, message, [{ text: 'Compris', style: 'default' }]);
+  const notify = (title: string, message: string) => {
+    if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
+    else Alert.alert(title, message, [{ text: 'Compris', style: 'default' }]);
+  };
+
+  /**
+   * Mot de passe oublié : si l'identifiant saisi est une adresse email, un lien
+   * de réinitialisation y est envoyé (la page s'ouvre dans le navigateur du
+   * téléphone). Sinon, le livreur est invité à saisir son email, ou à
+   * contacter son agence s'il n'en a pas.
+   */
+  const sendReset = async (email: string) => {
+    setSendingReset(true);
+    try {
+      await authService.requestPasswordReset(email);
+      feedback.success();
+      notify(
+        'Lien envoyé',
+        `Si un compte RUNEX existe pour ${email}, un lien vient d'y être envoyé (valable 15 minutes). Ouvrez-le, choisissez un nouveau mot de passe, puis reconnectez-vous ici.`
+      );
+    } catch (err: unknown) {
+      feedback.error();
+      const apiErr = err as ApiError;
+      notify(
+        'Envoi impossible',
+        apiErr?.status === 429
+          ? 'Trop de demandes. Patientez quelques minutes puis réessayez.'
+          : apiErr?.message || 'La demande n’a pas pu être envoyée. Réessayez.'
+      );
+    } finally {
+      setSendingReset(false);
     }
+  };
+
+  const handleForgotPassword = () => {
+    if (sendingReset) return;
+    const value = identifier.trim();
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    if (!isEmail) {
+      notify(
+        'Mot de passe oublié ?',
+        'Saisissez l’adresse email de votre compte dans le champ « Téléphone ou Matricule », puis touchez à nouveau « Mot de passe oublié ? » : vous recevrez un lien pour choisir un nouveau mot de passe.\n\nSans adresse email, contactez votre agence RUNEX.'
+      );
+      return;
+    }
+    const question = `Envoyer un lien de réinitialisation à ${value} ?`;
+    if (Platform.OS === 'web') {
+      if (window.confirm(question)) void sendReset(value);
+      return;
+    }
+    Alert.alert('Mot de passe oublié ?', question, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Envoyer', onPress: () => void sendReset(value) },
+    ]);
   };
 
   return (
@@ -254,8 +300,12 @@ export default function LoginScreen() {
               activeOpacity={0.7}
               onPress={handleForgotPassword}
               style={styles.forgotBtn}
+              disabled={sendingReset}
+              testID="login-forgot"
             >
-              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+              <Text style={styles.forgotText}>
+                {sendingReset ? 'Envoi du lien…' : 'Mot de passe oublié ?'}
+              </Text>
             </TouchableOpacity>
 
             {USE_MOCKS ? (

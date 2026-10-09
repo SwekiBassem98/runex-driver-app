@@ -34,6 +34,8 @@ export interface ApiDriverProfile {
   licensePlate?: string;
   depositName?: string;
   governorate?: string;
+  /** Zones couvertes, tenues par la plateforme. */
+  zones?: { id: string; name: string; code?: string; governorate?: string }[];
 }
 
 export interface ApiPackage {
@@ -236,8 +238,8 @@ export function toDriver(
     cin: previous?.cin ?? '',
     agency: profile?.depositName ?? user.depositName ?? '',
     matricule: profile?.licensePlate || profile?.driverCode || '',
-    // Les zones restent une préférence locale (la plateforme ne les gère pas encore).
-    zones: previous?.zones ?? [],
+    // Zones couvertes : tenues par la plateforme (« Mes zones »).
+    zones: profile?.zones ?? previous?.zones ?? [],
     status: 'on_duty',
   };
 }

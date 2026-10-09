@@ -104,6 +104,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="runsheet/[id]" />
             <Stack.Screen name="profile/zones" />
+            <Stack.Screen name="profile/password" />
           </Stack.Protected>
           {/* Galerie de composants : absente des builds de production. */}
           <Stack.Protected guard={__DEV__}>

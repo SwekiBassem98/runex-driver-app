@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -20,8 +21,10 @@ import { Zone, Driver } from '@/types';
  * Zones Management Screen
  * Route: /app/profile/zones.tsx
  *
- * Allows the driver to view, add, and remove assigned delivery zones,
- * backed directly by driversService.
+ * Le livreur choisit les zones qu'il couvre parmi les zones de la plateforme
+ * (créées automatiquement à la saisie des colis). Le choix est enregistré sur
+ * la plateforme : l'exploitation voit le livreur dans ces zones et le propose
+ * en premier pour leurs colis.
  */
 export default function ZonesManagementScreen() {
   const router = useRouter();
@@ -31,6 +34,7 @@ export default function ZonesManagementScreen() {
   const [allZones, setAllZones] = useState<Zone[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingZoneId, setUpdatingZoneId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -54,6 +58,20 @@ export default function ZonesManagementScreen() {
   }, []);
 
   const assignedZoneIds = new Set(driver?.zones?.map((z) => z.id) || []);
+
+  // Mes zones d'abord, puis par gouvernorat ; recherche sur nom et gouvernorat.
+  const visibleZones = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const mine = new Set(driver?.zones?.map((z) => z.id) || []);
+    return allZones
+      .filter((z) => !q || `${z.name} ${z.governorate ?? ''}`.toLowerCase().includes(q))
+      .sort(
+        (a, b) =>
+          Number(mine.has(b.id)) - Number(mine.has(a.id)) ||
+          (a.governorate ?? '').localeCompare(b.governorate ?? '', 'fr') ||
+          a.name.localeCompare(b.name, 'fr')
+      );
+  }, [allZones, driver, search]);
 
   const handleToggleZone = async (zone: Zone) => {
     if (updatingZoneId) return;
@@ -120,9 +138,22 @@ export default function ZonesManagementScreen() {
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle" size={20} color={colors.status.info} />
           <Text style={styles.infoBannerText}>
-            Activez ou désactivez les zones géographiques couvertes lors de vos tournées
-            quotidiennes.
+            Choisissez les zones que vous couvrez. L’exploitation vous proposera en priorité pour
+            les colis de ces zones.
           </Text>
+        </View>
+
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={18} color={colors.text.secondary} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Rechercher une délégation ou un gouvernorat"
+            placeholderTextColor={colors.text.secondary}
+            style={styles.searchInput}
+            autoCorrect={false}
+            accessibilityLabel="Rechercher une zone"
+          />
         </View>
 
         {loading ? (
@@ -132,7 +163,14 @@ export default function ZonesManagementScreen() {
           </View>
         ) : (
           <View style={styles.zonesList}>
-            {allZones.map((zone) => {
+            {visibleZones.length === 0 && (
+              <Text style={styles.loadingText}>
+                {allZones.length === 0
+                  ? 'Aucune zone pour l’instant : elles apparaissent avec les premiers colis.'
+                  : 'Aucune zone ne correspond à la recherche.'}
+              </Text>
+            )}
+            {visibleZones.map((zone) => {
               const isAssigned = assignedZoneIds.has(zone.id);
               const isProcessing = updatingZoneId === zone.id;
 
@@ -153,7 +191,7 @@ export default function ZonesManagementScreen() {
                     </View>
                     <View style={styles.zoneTextGroup}>
                       <Text style={styles.zoneName}>{zone.name}</Text>
-                      <Text style={styles.zoneCode}>{zone.code || 'ZONE-TN'}</Text>
+                      <Text style={styles.zoneCode}>{zone.governorate || zone.code || ''}</Text>
                     </View>
                   </View>
 
@@ -274,6 +312,23 @@ const styles = StyleSheet.create({
   },
   zonesList: {
     gap: spacing.sm,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radii.card,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.12)',
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    ...typography.body,
+    color: colors.text.primary,
   },
   zoneCard: {
     flexDirection: 'row',

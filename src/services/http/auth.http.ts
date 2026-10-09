@@ -85,6 +85,17 @@ class HttpAuthService implements AuthService {
     useAuthStore.getState().setDriver(driver);
     return driver;
   }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<number> {
+    const res = await unwrap<{ otherSessionsClosed?: number }>(
+      apiClient.post('/auth/change-password', { currentPassword, newPassword })
+    );
+    return res?.otherSessionsClosed ?? 0;
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    await apiClient.post('/auth/password-reset/request', { email: email.trim() });
+  }
 }
 
 export const httpAuthService = new HttpAuthService();
