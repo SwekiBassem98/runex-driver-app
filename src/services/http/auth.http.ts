@@ -1,3 +1,4 @@
+import { unregisterPush } from '@/services/push';
 import { apiClient, unwrap } from '@/services/api-client';
 import type { AuthResponse, AuthService, LoginPayload } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth.store';
@@ -57,6 +58,8 @@ class HttpAuthService implements AuthService {
 
   async logout(): Promise<void> {
     const { refreshToken } = useAuthStore.getState();
+    // Avant la fermeture de session : la désinscription est authentifiée.
+    await unregisterPush();
     try {
       await apiClient.post('/auth/logout', refreshToken ? { refreshToken } : {});
     } catch {

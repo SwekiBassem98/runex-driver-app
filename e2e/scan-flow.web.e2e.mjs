@@ -80,15 +80,29 @@ ok(
 );
 const Q = await mk('Client Ramassage E2E', 1);
 const demain = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-const pk = await api(admin, 'POST', '/ramassages', {
-  shipperId: Q.shipperId,
-  scheduledDate: demain,
-  timeSlotStartHour: 15,
-  timeSlotEndHour: 17,
-  assignedDriverId: hamzaId,
-  address: 'Zone industrielle, Ben Arous',
-  estimatedPackageCount: 2,
-});
+// Un seul ramassage par créneau et par expéditeur : on prend le premier
+// créneau libre, pour que le test reste rejouable sur la même base.
+let pk;
+for (const [from, to] of [
+  [15, 17],
+  [8, 10],
+  [10, 12],
+  [12, 14],
+  [17, 19],
+  [6, 8],
+  [19, 21],
+]) {
+  pk = await api(admin, 'POST', '/ramassages', {
+    shipperId: Q.shipperId,
+    scheduledDate: demain,
+    timeSlotStartHour: from,
+    timeSlotEndHour: to,
+    assignedDriverId: hamzaId,
+    address: 'Zone industrielle, Ben Arous',
+    estimatedPackageCount: 2,
+  });
+  if (pk.status !== 409 && !/déjà demandé/.test(pk.json?.message ?? '')) break;
+}
 ok(
   pk.status === 201 || pk.status === 200,
   'données : ramassage affecté au livreur',

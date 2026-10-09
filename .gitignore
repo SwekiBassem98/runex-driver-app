@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Clé du compte de service Firebase (secret, pour l'API seulement).
+# google-services.json, lui, est public et doit être committé.
+*firebase-adminsdk*.json
