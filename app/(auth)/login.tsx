@@ -107,9 +107,10 @@ export default function LoginScreen() {
           {/* Top RUNEX Logo */}
           <View style={styles.logoSection}>
             <Image
-              source={require('../../assets/logo/runex-logo.png')}
+              source={require('../../assets/brand/icon.png')}
               style={styles.logoImage}
-              resizeMode="contain"
+              resizeMode="cover"
+              accessibilityLabel="RUNEX"
             />
             <View style={styles.driverTagBadge}>
               <View style={styles.driverTagDot} />
@@ -295,8 +296,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   logoImage: {
-    width: 220,
-    height: 110,
+    width: 112,
+    height: 112,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    marginBottom: 6,
   },
   driverTagBadge: {
     flexDirection: 'row',

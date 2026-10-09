@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { BrandSplash, SPLASH_BACKGROUND } from '@/components/BrandSplash';
 import { prepareFeedback } from '@/services/feedback';
 import { registerForPush, startPushListeners } from '@/services/push';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { API_CONFIG_ERROR } from '@/config/env';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,7 +23,20 @@ import { useAuthStore } from '@/store/auth.store';
  *   Aucune redirection impérative : une redirection rejouée pendant la saisie
  *   détache l'écran et fait perdre le focus au champ (clavier qui se ferme).
  */
+// L'écran natif (fond anthracite, « R ») reste affiché jusqu'à ce que
+// l'ouverture animée soit montée : aucun écran blanc entre les deux.
+if (Platform.OS !== 'web') {
+  void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+  SplashScreen.setOptions({ duration: 250, fade: true });
+}
+
 export default function RootLayout() {
+  // Ouverture animée sur téléphone ; le build web (tests) s'en passe, sauf
+  // EXPO_PUBLIC_WEB_SPLASH=true pour la prévisualiser dans un navigateur.
+  const [splashVisible, setSplashVisible] = useState(
+    Platform.OS !== 'web' || process.env.EXPO_PUBLIC_WEB_SPLASH === 'true'
+  );
+  const hideSplash = useCallback(() => setSplashVisible(false), []);
   const hydrated = useAuthStore((s) => s.hydrated);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [fontsLoaded, fontError] = useFonts({
@@ -38,8 +53,6 @@ export default function RootLayout() {
     void prepareFeedback();
   }, []);
 
-  // APK mal configuré (adresse du serveur absente ou non sécurisée) : on
-  // l'annonce clairement plutôt que de laisser échouer chaque connexion.
   // Livreur connecté : notifications poussées (jeton envoyé à l'API à chaque
   // connexion et à chaque démarrage) et écoutes globales.
   useEffect(() => {
@@ -47,6 +60,12 @@ export default function RootLayout() {
     void registerForPush();
     return startPushListeners();
   }, [isAuthenticated]);
+
+  // APK mal configuré (adresse du serveur absente ou non sécurisée) : on
+  // l'annonce clairement plutôt que de laisser échouer chaque connexion.
+  useEffect(() => {
+    if (API_CONFIG_ERROR) void SplashScreen.hideAsync().catch(() => undefined);
+  }, []);
 
   if (API_CONFIG_ERROR) {
     return (
@@ -70,40 +89,29 @@ export default function RootLayout() {
     );
   }
 
-  if (!hydrated || (!fontsLoaded && !fontError)) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: '#0A0A0A',
-        }}
-      >
-        <StatusBar style="light" />
-        <ActivityIndicator color="#E31E2B" />
-      </View>
-    );
-  }
+  const ready = hydrated && (fontsLoaded || !!fontError);
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: SPLASH_BACKGROUND }}>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
-        <Stack.Screen name="index" />
-        <Stack.Protected guard={!isAuthenticated}>
-          <Stack.Screen name="(auth)" />
-        </Stack.Protected>
-        <Stack.Protected guard={isAuthenticated}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="runsheet/[id]" />
-          <Stack.Screen name="profile/zones" />
-        </Stack.Protected>
-        {/* Galerie de composants : absente des builds de production. */}
-        <Stack.Protected guard={__DEV__}>
-          <Stack.Screen name="_dev/components" />
-        </Stack.Protected>
-      </Stack>
-    </>
+      {ready && (
+        <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
+          <Stack.Screen name="index" />
+          <Stack.Protected guard={!isAuthenticated}>
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
+          <Stack.Protected guard={isAuthenticated}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="runsheet/[id]" />
+            <Stack.Screen name="profile/zones" />
+          </Stack.Protected>
+          {/* Galerie de composants : absente des builds de production. */}
+          <Stack.Protected guard={__DEV__}>
+            <Stack.Screen name="_dev/components" />
+          </Stack.Protected>
+        </Stack>
+      )}
+      {splashVisible && <BrandSplash ready={ready} onFinish={hideSplash} />}
+    </View>
   );
 }

@@ -32,6 +32,13 @@ Elle travaille sur l'API RUNEX réelle ; un mode démonstration reste disponible
   la notification ouvre l'écran concerné. Application ouverte, l'accueil, la tournée et
   les ramassages se rechargent seuls (notification reçue, retour dans l'application).
 
+- **Identité** : icône RUNEX (icône adaptative Android avec version monochrome pour les
+  icônes à thème), écran de démarrage natif anthracite, puis ouverture animée
+  (`src/components/BrandSplash.tsx`) : traînées rouges, « R » sur halo, « RUNEX » avec reflet,
+  « ESPACE LIVREUR », barre de chargement, fondu vers la connexion. Respecte « Réduire les
+  animations ». Images régénérées depuis l'icône source :
+  `python3 scripts/generate-brand-assets.py assets/brand/icon-source.jpg`.
+
 Contrat de l'API : `docs/MOBILE-SCAN.md` dans le dépôt `runex-platforme`.
 
 ## Lancer en développement
