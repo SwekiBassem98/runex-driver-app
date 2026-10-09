@@ -10,7 +10,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACER-PAR-L-URL-KOYEB.koyeb.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://runex-api-ji66.onrender.com/api/v1"
       }
     },
     "production": {
@@ -18,7 +18,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REMPLACER-PAR-L-URL-KOYEB.koyeb.app/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://runex-api-ji66.onrender.com/api/v1"
       }
     }
   }

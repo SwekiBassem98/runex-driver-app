@@ -38,7 +38,10 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "allowBackup": false
+      "allowBackup": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/logo/runex-logo.png",
@@ -56,6 +59,12 @@
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b5d6c4e6-3d23-4958-8928-53dd741255cb"
+      }
+    }
   }
 }
