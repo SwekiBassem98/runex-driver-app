@@ -20,6 +20,10 @@ export interface AuthService {
   logout(): Promise<void>;
   refreshToken(refreshToken: string): Promise<{ token: string }>;
   getMe(): Promise<Driver>;
+  /** Changement par le livreur connecté ; renvoie le nombre d'autres sessions fermées. */
+  changePassword(currentPassword: string, newPassword: string): Promise<number>;
+  /** Envoie un lien de réinitialisation à l'adresse email du compte. */
+  requestPasswordReset(email: string): Promise<void>;
 }
 
 const delay = (ms?: number) =>
@@ -94,6 +98,25 @@ class MockAuthService implements AuthService {
     const stored = useAuthStore.getState().driver;
     if (stored) return stored;
     return { ...mockDriverProfile };
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<number> {
+    await delay();
+    if (currentPassword === '0000') {
+      throw new AppApiError(400, 'Le mot de passe actuel est incorrect.', 'INVALID_PASSWORD');
+    }
+    if (newPassword.length < 8) {
+      throw new AppApiError(
+        400,
+        'Le mot de passe doit contenir au moins 8 caractères.',
+        'WEAK_PASSWORD'
+      );
+    }
+    return 0;
+  }
+
+  async requestPasswordReset(): Promise<void> {
+    await delay();
   }
 }
 

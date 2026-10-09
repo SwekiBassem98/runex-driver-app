@@ -8,6 +8,8 @@ export interface Zone {
   id: string;
   name: string;
   code?: string;
+  /** Gouvernorat de la zone (zones de la plateforme). */
+  governorate?: string;
 }
 
 export interface Driver {

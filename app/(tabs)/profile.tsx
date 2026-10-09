@@ -266,7 +266,9 @@ export default function ProfileScreen() {
                     </View>
                     <View style={styles.manageZonesTextGroup}>
                       <Text style={styles.manageZonesTitle}>Gérer mes Zones</Text>
-                      <Text style={styles.manageZonesSubtitle}>Créer, modifier et organiser</Text>
+                      <Text style={styles.manageZonesSubtitle}>
+                        Choisir les zones que je couvre
+                      </Text>
                     </View>
                   </View>
 
@@ -294,6 +296,30 @@ export default function ProfileScreen() {
                     )}
                   </View>
                 </View>
+              </View>
+            </View>
+
+            {/* Sécurité : changement de mot de passe */}
+            <View style={styles.sectionWrapper}>
+              <Text style={styles.sectionTitle}>Sécurité</Text>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => router.push('/profile/password')}
+                  style={styles.manageZonesRow}
+                  testID="open-change-password"
+                >
+                  <View style={styles.manageZonesLeft}>
+                    <View style={styles.manageZonesIconCircle}>
+                      <Ionicons name="key-outline" size={20} color={colors.primary} />
+                    </View>
+                    <View style={styles.manageZonesTextGroup}>
+                      <Text style={styles.manageZonesTitle}>Changer le mot de passe</Text>
+                      <Text style={styles.manageZonesSubtitle}>Mot de passe actuel exigé</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.text.secondary} />
+                </TouchableOpacity>
               </View>
             </View>
 

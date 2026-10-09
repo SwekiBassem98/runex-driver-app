@@ -1,13 +1,27 @@
 import type { DriversService } from '@/services/drivers.service';
-import { tunisianZones } from '@/services/zones';
+import { apiClient, unwrap } from '@/services/api-client';
 import { useAuthStore } from '@/store/auth.store';
 import { Driver, Zone } from '@/types';
 import { httpAuthService } from './auth.http';
 
+interface ApiZone {
+  id: string;
+  name: string;
+  code?: string;
+  governorate?: string;
+}
+
+const toZone = (z: ApiZone): Zone => ({
+  id: z.id,
+  name: z.name,
+  code: z.code,
+  governorate: z.governorate,
+});
+
 /**
- * Profil du livreur. L'identité vient de l'API (`/auth/me`, `/drivers/me`).
- * Les zones et le statut de service ne sont pas encore gérés par la
- * plateforme : ils restent des préférences enregistrées sur le téléphone.
+ * Profil du livreur. L'identité et les zones couvertes viennent de l'API
+ * (`/drivers/me`, `/drivers/me/zones`). Le statut de service reste une
+ * préférence du téléphone.
  */
 class HttpDriversService implements DriversService {
   async getCurrentDriver(): Promise<Driver> {
@@ -26,28 +40,31 @@ class HttpDriversService implements DriversService {
   }
 
   async getDriverZones(): Promise<Zone[]> {
-    return [...(this.current().zones ?? [])];
+    const zones = await unwrap<ApiZone[]>(apiClient.get('/drivers/me/zones'));
+    return zones.map(toZone);
   }
 
+  /** Zones actives de la plateforme (créées automatiquement à la saisie des colis). */
   async getAllZones(): Promise<Zone[]> {
-    return [...tunisianZones];
+    const zones = await unwrap<ApiZone[]>(apiClient.get('/zones'));
+    return zones.map(toZone);
   }
 
   async addDriverZone(zoneId: string): Promise<Driver> {
     const d = this.current();
-    const zone = tunisianZones.find((z) => z.id === zoneId);
-    if (!zone || d.zones.some((z) => z.id === zoneId)) return { ...d };
-    return this.save({ ...d, zones: [...d.zones, zone] });
+    if (d.zones.some((z) => z.id === zoneId)) return { ...d };
+    return this.updateDriverZones([...d.zones.map((z) => z.id), zoneId]);
   }
 
   async removeDriverZone(zoneId: string): Promise<Driver> {
     const d = this.current();
-    return this.save({ ...d, zones: d.zones.filter((z) => z.id !== zoneId) });
+    return this.updateDriverZones(d.zones.filter((z) => z.id !== zoneId).map((z) => z.id));
   }
 
+  /** Enregistre les zones sur la plateforme : l'exploitation les voit aussitôt. */
   async updateDriverZones(zoneIds: string[]): Promise<Driver> {
-    const d = this.current();
-    return this.save({ ...d, zones: tunisianZones.filter((z) => zoneIds.includes(z.id)) });
+    const zones = await unwrap<ApiZone[]>(apiClient.put('/drivers/me/zones', { zoneIds }));
+    return this.save({ ...this.current(), zones: zones.map(toZone) });
   }
 
   async updateDriverStatus(status: 'active' | 'on_duty' | 'off_duty'): Promise<Driver> {
