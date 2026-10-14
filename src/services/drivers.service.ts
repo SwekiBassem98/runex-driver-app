@@ -1,4 +1,4 @@
-import { Driver, Zone } from '@/types';
+import { Driver, DriverGains, Zone } from '@/types';
 import { USE_MOCKS } from '@/config/env';
 import { tunisianZones } from './zones';
 import { httpDriversService } from './http/drivers.http';
@@ -14,6 +14,8 @@ export interface DriversService {
   removeDriverZone(zoneId: string): Promise<Driver>;
   updateDriverZones(zoneIds: string[]): Promise<Driver>;
   updateDriverStatus(status: 'active' | 'on_duty' | 'off_duty'): Promise<Driver>;
+  /** Gains : 3 DT par colis livré ou ramassage effectué, payé / reste à payer. */
+  getGains(): Promise<DriverGains>;
 }
 
 const delay = (ms?: number) =>
@@ -94,6 +96,19 @@ class MockDriversService implements DriversService {
     };
     useAuthStore.getState().setDriver(this.currentDriver);
     return { ...this.currentDriver };
+  }
+
+  async getGains(): Promise<DriverGains> {
+    await delay(150);
+    return {
+      tarif: 3,
+      aujourdhui: { livres: 4, ramassages: 1, gain: 15 },
+      ceMois: { livres: 62, ramassages: 9, gain: 213 },
+      totalGagne: 213,
+      totalPaye: 150,
+      resteAPayer: 63,
+      dernierPaiement: null,
+    };
   }
 }
 

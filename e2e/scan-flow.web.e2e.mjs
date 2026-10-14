@@ -253,6 +253,13 @@ ok(
   'accueil : compteurs de la tournée réelle'
 );
 await shot('02b-home-loaded');
+ok(
+  (await waitText(/Mes gains/)) && /Reste à vous payer/.test(await bodyText()),
+  'accueil : carte « Mes gains » (3 DT par colis livré ou ramassage)'
+);
+// Colis affecté depuis le web (sans choisir de tournée) : visible dans la tournée.
+await page.goto(`${APP}/runsheet`, { waitUntil: 'networkidle2' });
+ok(await waitText(/Client Scan E2E/), 'tournée : le colis affecté depuis le web est visible');
 for (const [route, label] of [
   ['runsheet', 'tournée'],
   ['retour', 'retours'],

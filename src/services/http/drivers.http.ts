@@ -1,7 +1,7 @@
 import type { DriversService } from '@/services/drivers.service';
 import { apiClient, unwrap } from '@/services/api-client';
 import { useAuthStore } from '@/store/auth.store';
-import { Driver, Zone } from '@/types';
+import { Driver, DriverGains, Zone } from '@/types';
 import { httpAuthService } from './auth.http';
 
 interface ApiZone {
@@ -37,6 +37,10 @@ class HttpDriversService implements DriversService {
   private save(driver: Driver): Driver {
     useAuthStore.getState().setDriver(driver);
     return { ...driver };
+  }
+
+  async getGains(): Promise<DriverGains> {
+    return unwrap<DriverGains>(apiClient.get('/drivers/me/gains'));
   }
 
   async getDriverZones(): Promise<Zone[]> {
