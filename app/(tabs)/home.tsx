@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { StatCard, BottomNav, ErrorBanner } from '@/components';
+import { StatCard, BottomNav, ErrorBanner, GainsCard } from '@/components';
 import { useAuthStore } from '@/store/auth.store';
 import { useUiStore } from '@/store/ui.store';
 import { dashboardService } from '@/services/dashboard.service';
@@ -296,6 +296,8 @@ export default function HomeScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
           </TouchableOpacity>
+
+          <GainsCard />
         </View>
       </ScrollView>
 

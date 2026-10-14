@@ -33,6 +33,9 @@ import { Parcel, ParcelStatus, ApiError, formatTND } from '@/types';
  * - postponeParcel ("Reporter") -> tests 403 permission handling
  * - returnParcel ("Retourner" with reason modal)
  */
+/** Au-delà, le système retourne automatiquement le colis au dépôt. */
+const MAX_TENTATIVES = 3;
+
 export default function ParcelDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -153,11 +156,22 @@ export default function ParcelDetailScreen() {
     setError(null);
     setPostponeModalVisible(false);
     try {
-      await runsheetsService.postponeParcel(parcel.id, {
+      // Nouvelle tentative : demain (jour de Tunis).
+      const demain = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tunis' }).format(
+        new Date(Date.now() + 24 * 3600 * 1000)
+      );
+      const resultat = await runsheetsService.postponeParcel(parcel.id, {
         reason: postponeReason.trim(),
-        nextDeliveryDate: '2026-09-30',
+        nextDeliveryDate: demain,
       });
       feedback.success();
+      if (resultat?.status === 'returned') {
+        // 3e tentative sans livraison : le système a retourné le colis.
+        Alert.alert(
+          'Retour automatique',
+          `${MAX_TENTATIVES} tentatives sans livraison : le colis passe en retour. Rapportez-le au dépôt.`
+        );
+      }
       router.back();
     } catch (err: unknown) {
       feedback.error();
@@ -300,6 +314,18 @@ export default function ParcelDetailScreen() {
                 )}
                 {parcel.backendStatusLabel && (
                   <Text style={styles.factMuted}>Statut : {parcel.backendStatusLabel}</Text>
+                )}
+                {actionable && (parcel.attempts ?? 0) > 0 && (
+                  <Text
+                    style={[
+                      styles.factMuted,
+                      (parcel.attempts ?? 0) >= MAX_TENTATIVES - 1 && styles.attemptWarning,
+                    ]}
+                    testID="tentatives"
+                  >
+                    Tentatives : {parcel.attempts} / {MAX_TENTATIVES}
+                    {(parcel.attempts ?? 0) >= MAX_TENTATIVES - 1 ? ' — dernière tentative' : ''}
+                  </Text>
                 )}
                 {parcel.shipperName && (
                   <Text style={styles.factMuted}>Expéditeur : {parcel.shipperName}</Text>
@@ -532,6 +558,14 @@ export default function ParcelDetailScreen() {
             <Text style={styles.modalSubtitle}>
               Indiquez la raison du report demandé par le client :
             </Text>
+            {(parcel?.attempts ?? 0) >= MAX_TENTATIVES - 1 && (
+              <View style={styles.lastAttemptBox} testID="derniere-tentative">
+                <Ionicons name="warning-outline" size={18} color={colors.warning} />
+                <Text style={styles.lastAttemptText}>
+                  Dernière tentative : ce report retournera automatiquement le colis au dépôt.
+                </Text>
+              </View>
+            )}
 
             {['Client absent', 'Reporté à demain 14h', 'Client demande report fin de semaine'].map(
               (r) => (
@@ -646,6 +680,26 @@ export default function ParcelDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  attemptWarning: {
+    color: '#B45309',
+    fontWeight: '700',
+  },
+  lastAttemptBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FCD34D',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 12,
+  },
+  lastAttemptText: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: 13,
+  },
   pieceBanner: {
     flexDirection: 'row',
     alignItems: 'center',

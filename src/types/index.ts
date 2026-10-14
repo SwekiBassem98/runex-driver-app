@@ -124,6 +124,18 @@ export interface DashboardStats {
   cashCollected: number; // TND with 3 decimal places
 }
 
+/** Gains du livreur : un tarif fixe par colis livré ou ramassage effectué. */
+export interface DriverGains {
+  tarif: number;
+  aujourdhui: { livres: number; ramassages: number; gain: number };
+  ceMois: { livres: number; ramassages: number; gain: number };
+  totalGagne: number;
+  totalPaye: number;
+  resteAPayer: number;
+  /** Date du dernier paiement (ISO), s'il y en a un. */
+  dernierPaiement: string | null;
+}
+
 export interface ApiError {
   status: number;
   code?: string;
