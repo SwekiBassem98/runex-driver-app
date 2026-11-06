@@ -21,10 +21,11 @@ import { Zone, Driver } from '@/types';
  * Zones Management Screen
  * Route: /app/profile/zones.tsx
  *
- * Le livreur choisit les zones qu'il couvre parmi les zones de la plateforme
+ * Le livreur choisit ses zones du jour parmi les zones de la plateforme
  * (créées automatiquement à la saisie des colis). Le choix est enregistré sur
  * la plateforme : l'exploitation voit le livreur dans ces zones et le propose
- * en premier pour leurs colis.
+ * en premier pour leurs colis. Il vaut pour la journée : à minuit (heure de
+ * Tunis) les zones sont effacées et le livreur les choisit à nouveau.
  */
 export default function ZonesManagementScreen() {
   const router = useRouter();
@@ -38,10 +39,11 @@ export default function ZonesManagementScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    Promise.all([driversService.getCurrentDriver(), driversService.getAllZones()])
-      .then(([currentDriver, zones]) => {
+    Promise.all([driversService.getCurrentDriver(), driversService.getAllZones(), driversService.getDriverZones()])
+      .then(([currentDriver, zones, duJour]) => {
         if (!isMounted) return;
-        setDriver(currentDriver);
+        // Zones du jour lues sur la plateforme (jamais celles de la veille).
+        setDriver({ ...currentDriver, zones: duJour });
         setAllZones(zones);
       })
       .catch(() => {
@@ -80,14 +82,6 @@ export default function ZonesManagementScreen() {
     try {
       let updated: Driver;
       if (assignedZoneIds.has(zone.id)) {
-        if (assignedZoneIds.size <= 1) {
-          Alert.alert(
-            'Action impossible',
-            'Vous devez avoir au moins une zone assignée à votre profil.'
-          );
-          setUpdatingZoneId(null);
-          return;
-        }
         updated = await driversService.removeDriverZone(zone.id);
       } else {
         updated = await driversService.addDriverZone(zone.id);
@@ -116,10 +110,10 @@ export default function ZonesManagementScreen() {
           </TouchableOpacity>
 
           <View style={styles.headerTitleGroup}>
-            <Text style={styles.headerTitle}>Gérer mes Zones</Text>
+            <Text style={styles.headerTitle}>Mes zones du jour</Text>
             <Text style={styles.headerSubtitle}>
-              {assignedZoneIds.size} zone{assignedZoneIds.size > 1 ? 's' : ''} assignée
-              {assignedZoneIds.size > 1 ? 's' : ''}
+              {assignedZoneIds.size} zone{assignedZoneIds.size > 1 ? 's' : ''} choisie
+              {assignedZoneIds.size > 1 ? 's' : ''} aujourd’hui
             </Text>
           </View>
         </View>
@@ -138,8 +132,9 @@ export default function ZonesManagementScreen() {
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle" size={20} color={colors.status.info} />
           <Text style={styles.infoBannerText}>
-            Choisissez les zones que vous couvrez. L’exploitation vous proposera en priorité pour
-            les colis de ces zones.
+            Choisissez les zones que vous couvrez aujourd’hui. L’exploitation vous proposera en
+            priorité pour les colis de ces zones. Chaque journée a ses zones : elles sont effacées à
+            minuit et à choisir de nouveau le lendemain.
           </Text>
         </View>
 
@@ -199,6 +194,8 @@ export default function ZonesManagementScreen() {
                     activeOpacity={0.8}
                     onPress={() => handleToggleZone(zone)}
                     disabled={isProcessing}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isAssigned ? 'Retirer' : 'Ajouter'} la zone ${zone.name}`}
                     style={[
                       styles.toggleButton,
                       isAssigned ? styles.toggleButtonRemove : styles.toggleButtonAdd,

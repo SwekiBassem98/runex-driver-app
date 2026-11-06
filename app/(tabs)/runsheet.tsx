@@ -26,6 +26,7 @@ import {
 import { useActiveRunsheet } from '@/hooks';
 import { driversService } from '@/services/drivers.service';
 import { Zone } from '@/types';
+import { colisDansZone, jourTunis } from '@/utils/zones';
 import { useUiStore } from '@/store/ui.store';
 
 /**
@@ -56,13 +57,47 @@ export default function RunsheetScreen() {
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [zoneModalVisible, setZoneModalVisible] = useState(false);
 
-  // Fetch zones from driver profile
+  // Zones du jour du livreur (la plateforme efface celles de la veille). On les
+  // relit à l'ouverture et quand la journée change, et un filtre choisi la
+  // veille est oublié.
+  const [jour, setJour] = useState(jourTunis());
   useEffect(() => {
+    const t = setInterval(() => setJour(jourTunis()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    setSelectedZone(null);
     driversService
       .getDriverZones()
       .then((zones) => setAvailableZones(zones))
-      .catch(() => {});
-  }, []);
+      .catch(() => setAvailableZones([]));
+  }, [jour]);
+
+  // Zones proposées au filtre : mes zones du jour d'abord, puis les autres
+  // zones où la tournée a des colis — chacune avec son nombre de colis.
+  const zoneOptions = useMemo(() => {
+    const options: { zone: Zone; mine: boolean; count: number }[] = availableZones.map((zone) => ({
+      zone,
+      mine: true,
+      count: allParcels.filter((p) => colisDansZone(p, zone)).length,
+    }));
+    const autres = new Map<string, Zone>();
+    for (const p of allParcels) {
+      if (!p.zoneId || options.some((o) => colisDansZone(p, o.zone))) continue;
+      if (!autres.has(p.zoneId)) {
+        autres.set(p.zoneId, {
+          id: p.zoneId,
+          name: p.zoneName || p.governorate || 'Zone',
+          governorate: p.governorate,
+          delegation: p.delegation,
+        });
+      }
+    }
+    for (const zone of autres.values()) {
+      options.push({ zone, mine: false, count: allParcels.filter((p) => colisDansZone(p, zone)).length });
+    }
+    return options;
+  }, [availableZones, allParcels]);
 
   // Compute live counts per tab from the loaded runsheet
   const tabs = useMemo(
@@ -121,9 +156,9 @@ export default function RunsheetScreen() {
       }
     }
 
-    // 2. Zone Filter
+    // 2. Zone Filter (identifiant de zone, ou gouvernorat + délégation)
     if (selectedZone) {
-      result = result.filter((p) => p.zoneId === selectedZone.id);
+      result = result.filter((p) => colisDansZone(p, selectedZone));
     }
 
     // 3. Search Query Filter (code, client name, phone, address)
@@ -352,7 +387,7 @@ export default function RunsheetScreen() {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Filtrer par Zone</Text>
-                <Text style={styles.modalSubtitle}>Zones assignées à votre profil livreur</Text>
+                <Text style={styles.modalSubtitle}>Mes zones du jour et zones des colis</Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.75}
@@ -395,10 +430,15 @@ export default function RunsheetScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Driver Assigned Zones */}
-            {availableZones.map((zone) => {
+            {zoneOptions.length === 0 && (
+              <Text style={styles.zoneEmptyText}>
+                Aucune zone aujourd’hui : choisissez vos zones du jour dans Profil › Gérer mes zones.
+              </Text>
+            )}
+
+            {/* Mes zones du jour, puis les zones des colis de la tournée */}
+            {zoneOptions.map(({ zone, mine, count: countInZone }) => {
               const isSelected = selectedZone?.id === zone.id;
-              const countInZone = allParcels.filter((p) => p.zoneId === zone.id).length;
 
               return (
                 <TouchableOpacity
@@ -422,7 +462,9 @@ export default function RunsheetScreen() {
                       >
                         {zone.name}
                       </Text>
-                      {zone.code && <Text style={styles.zoneOptionCode}>{zone.code}</Text>}
+                      <Text style={styles.zoneOptionCode}>
+                        {mine ? 'Ma zone du jour' : 'Zone des colis de la tournée'}
+                      </Text>
                     </View>
                   </View>
 
@@ -455,6 +497,12 @@ export default function RunsheetScreen() {
 }
 
 const styles = StyleSheet.create({
+  zoneEmptyText: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background.header,

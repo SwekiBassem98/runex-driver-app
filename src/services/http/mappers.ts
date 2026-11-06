@@ -1,3 +1,4 @@
+import { cleZone, jourTunis } from '@/utils/zones';
 import { Driver, Parcel, ParcelStatus, Ramassage, Runsheet, RunsheetStatus } from '@/types';
 
 /**
@@ -35,7 +36,7 @@ export interface ApiDriverProfile {
   depositName?: string;
   governorate?: string;
   /** Zones couvertes, tenues par la plateforme. */
-  zones?: { id: string; name: string; code?: string; governorate?: string }[];
+  zones?: { id: string; name: string; code?: string; governorate?: string; delegation?: string }[];
 }
 
 export interface ApiPackage {
@@ -46,6 +47,9 @@ export interface ApiPackage {
   customerPhone: string;
   governorate: string;
   delegation: string;
+  /** Zone de la plateforme (adresse du destinataire). */
+  zoneId?: string;
+  zoneName?: string;
   address: string;
   packageType: string;
   status: string;
@@ -155,8 +159,10 @@ export function toParcel(p: ApiPackage, sequenceOrder?: number): Parcel {
     address: [p.address, p.delegation, p.governorate].filter(Boolean).join(', '),
     governorate: p.governorate,
     delegation: p.delegation,
-    zoneId: p.governorate,
-    zoneName: p.delegation ? `${p.governorate} · ${p.delegation}` : p.governorate,
+    // Zone de la plateforme (adresse du destinataire) ; à défaut, la clé
+    // (gouvernorat, délégation) — le filtre « Zones » compare les deux.
+    zoneId: p.zoneId || cleZone(p.governorate, p.delegation),
+    zoneName: p.zoneName || (p.delegation ? `${p.delegation} (${p.governorate})` : p.governorate),
     status: toParcelStatus(p.status, Boolean(p.exchange)),
     backendStatus: p.status,
     backendStatusLabel: BACKEND_STATUS_LABELS[p.status] ?? p.status,
@@ -238,8 +244,10 @@ export function toDriver(
     cin: previous?.cin ?? '',
     agency: profile?.depositName ?? user.depositName ?? '',
     matricule: profile?.licensePlate || profile?.driverCode || '',
-    // Zones couvertes : tenues par la plateforme (« Mes zones »).
-    zones: profile?.zones ?? previous?.zones ?? [],
+    // Zones du jour : tenues par la plateforme (« Mes zones »). Celles gardées
+    // sur le téléphone ne servent que si elles ont été lues aujourd'hui.
+    zones: profile?.zones ?? (previous?.zonesDay === jourTunis() ? previous.zones : []),
+    zonesDay: profile?.zones ? jourTunis() : previous?.zonesDay === jourTunis() ? previous.zonesDay : undefined,
     status: 'on_duty',
   };
 }

@@ -23,6 +23,7 @@ import { authService } from '@/services/auth.service';
 import { useAuthStore } from '@/store/auth.store';
 import { USE_MOCKS } from '@/config/env';
 import { Driver, Zone } from '@/types';
+import { zonesDuJour } from '@/utils/zones';
 
 /**
  * RUNEX Driver Profile Screen
@@ -133,7 +134,8 @@ export default function ProfileScreen() {
   const driverPhone = driver?.phone || storedDriver?.phone || '—';
   const driverCin = driver?.cin || storedDriver?.cin || '—';
   const driverAgency = driver?.agency || storedDriver?.agency || '—';
-  const assignedZones: Zone[] = driver?.zones || storedDriver?.zones || [];
+  // Zones du jour seulement : celles d'un autre jour ne sont jamais affichées.
+  const assignedZones: Zone[] = zonesDuJour(driver?.zonesDay ? driver : storedDriver);
 
   return (
     <View style={styles.container}>
@@ -267,7 +269,7 @@ export default function ProfileScreen() {
                     <View style={styles.manageZonesTextGroup}>
                       <Text style={styles.manageZonesTitle}>Gérer mes Zones</Text>
                       <Text style={styles.manageZonesSubtitle}>
-                        Choisir les zones que je couvre
+                        Choisir mes zones du jour
                       </Text>
                     </View>
                   </View>
@@ -280,7 +282,7 @@ export default function ProfileScreen() {
                 {/* Assigned Zones list */}
                 <View style={styles.assignedZonesContainer}>
                   <Text style={styles.assignedZonesHeader}>
-                    Zones actuellement assignées ({assignedZones.length}) :
+                    Mes zones aujourd’hui ({assignedZones.length}) :
                   </Text>
                   <View style={styles.zonesChipsWrapper}>
                     {assignedZones.length > 0 ? (
@@ -292,7 +294,9 @@ export default function ProfileScreen() {
                         </View>
                       ))
                     ) : (
-                      <Text style={styles.noZonesText}>Aucune zone assignée.</Text>
+                      <Text style={styles.noZonesText}>
+                        Aucune zone choisie aujourd’hui. Chaque journée a ses zones : choisissez-les.
+                      </Text>
                     )}
                   </View>
                 </View>
