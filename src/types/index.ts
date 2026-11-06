@@ -10,6 +10,8 @@ export interface Zone {
   code?: string;
   /** Gouvernorat de la zone (zones de la plateforme). */
   governorate?: string;
+  /** Délégation de la zone (zones de la plateforme). */
+  delegation?: string;
 }
 
 export interface Driver {
@@ -18,7 +20,10 @@ export interface Driver {
   phone: string;
   cin: string;
   agency: string;
+  /** Zones choisies pour la journée (voir `zonesDay`). */
   zones: Zone[];
+  /** Journée (AAAA-MM-JJ, heure de Tunis) à laquelle `zones` a été lu. */
+  zonesDay?: string;
   matricule: string;
   avatarUrl?: string;
   status?: 'active' | 'on_duty' | 'off_duty';

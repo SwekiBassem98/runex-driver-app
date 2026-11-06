@@ -1,3 +1,4 @@
+import { jourTunis } from '@/utils/zones';
 import type { DriversService } from '@/services/drivers.service';
 import { apiClient, unwrap } from '@/services/api-client';
 import { useAuthStore } from '@/store/auth.store';
@@ -9,6 +10,7 @@ interface ApiZone {
   name: string;
   code?: string;
   governorate?: string;
+  delegation?: string;
 }
 
 const toZone = (z: ApiZone): Zone => ({
@@ -16,6 +18,7 @@ const toZone = (z: ApiZone): Zone => ({
   name: z.name,
   code: z.code,
   governorate: z.governorate,
+  delegation: z.delegation,
 });
 
 /**
@@ -43,9 +46,12 @@ class HttpDriversService implements DriversService {
     return unwrap<DriverGains>(apiClient.get('/drivers/me/gains'));
   }
 
+  /** Zones du jour, lues sur la plateforme (et gardées sur le téléphone pour la journée). */
   async getDriverZones(): Promise<Zone[]> {
-    const zones = await unwrap<ApiZone[]>(apiClient.get('/drivers/me/zones'));
-    return zones.map(toZone);
+    const zones = (await unwrap<ApiZone[]>(apiClient.get('/drivers/me/zones'))).map(toZone);
+    const d = useAuthStore.getState().driver;
+    if (d) this.save({ ...d, zones, zonesDay: jourTunis() });
+    return zones;
   }
 
   /** Zones actives de la plateforme (créées automatiquement à la saisie des colis). */
@@ -54,21 +60,23 @@ class HttpDriversService implements DriversService {
     return zones.map(toZone);
   }
 
+  // Ajout et retrait partent des zones du jour lues sur la plateforme : une
+  // zone gardée de la veille sur le téléphone ne doit pas être renvoyée.
   async addDriverZone(zoneId: string): Promise<Driver> {
-    const d = this.current();
-    if (d.zones.some((z) => z.id === zoneId)) return { ...d };
-    return this.updateDriverZones([...d.zones.map((z) => z.id), zoneId]);
+    const actuelles = await this.getDriverZones();
+    if (actuelles.some((z) => z.id === zoneId)) return { ...this.current() };
+    return this.updateDriverZones([...actuelles.map((z) => z.id), zoneId]);
   }
 
   async removeDriverZone(zoneId: string): Promise<Driver> {
-    const d = this.current();
-    return this.updateDriverZones(d.zones.filter((z) => z.id !== zoneId).map((z) => z.id));
+    const actuelles = await this.getDriverZones();
+    return this.updateDriverZones(actuelles.filter((z) => z.id !== zoneId).map((z) => z.id));
   }
 
   /** Enregistre les zones sur la plateforme : l'exploitation les voit aussitôt. */
   async updateDriverZones(zoneIds: string[]): Promise<Driver> {
     const zones = await unwrap<ApiZone[]>(apiClient.put('/drivers/me/zones', { zoneIds }));
-    return this.save({ ...this.current(), zones: zones.map(toZone) });
+    return this.save({ ...this.current(), zones: zones.map(toZone), zonesDay: jourTunis() });
   }
 
   async updateDriverStatus(status: 'active' | 'on_duty' | 'off_duty'): Promise<Driver> {
