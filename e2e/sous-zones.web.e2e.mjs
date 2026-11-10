@@ -173,7 +173,7 @@ await shot('sous-zones-liste');
 
 console.log('\n3. Filtre « Zones »');
 await tap('Toutes les Zones');
-ok(await waitText(/Mes sous-zones/), 'filtre : rubrique « Mes sous-zones »');
+ok(await waitText(/Mes sous-zones|MES SOUS-ZONES/), 'filtre : rubrique « Mes sous-zones »');
 const t = await bodyText();
 ok(/Rue de Marseille\s*Ma sous-zone\s*2/.test(t), 'sous-zone proposée avec son nombre de colis (2)', t.slice(t.indexOf('Mes sous-zones'), t.indexOf('Mes sous-zones') + 80));
 await shot('sous-zones-filtre');
@@ -209,8 +209,9 @@ ok(ord[0] === codes[1] && ord[1] === codes[2] && ord[2] === codes[0], 'tri : sou
 await tap(codes[0]);
 await waitText(/Sous-zone : Zitouna/, 10000);
 await page.click('[data-testid="sous-zone-colis"]');
-await page.waitForSelector('[data-testid="sous-zone-retirer"]', { timeout: 5000 });
-await page.click('[data-testid="sous-zone-retirer"]');
+await page.waitForSelector('[data-testid="sous-zone-retirer"]', { timeout: 5000, visible: true });
+await pause(600);
+await page.$eval('[data-testid="sous-zone-retirer"]', (el) => el.click());
 ok(await waitText(/Ranger dans une sous-zone/), 'sous-zone retirée');
 ok((await sousZoneApi(nouveaux[0])) === null, 'plateforme : plus de sous-zone');
 
