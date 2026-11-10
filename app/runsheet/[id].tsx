@@ -19,9 +19,10 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, typography, spacing, radii, shadows } from '@/theme';
-import { Badge, BadgeStatus, PrimaryButton, SecondaryButton, ErrorBanner } from '@/components';
+import { Badge, BadgeStatus, PrimaryButton, SecondaryButton, ErrorBanner, SubZoneSheet } from '@/components';
 import { runsheetsService } from '@/services/runsheets.service';
 import { Parcel, ParcelStatus, ApiError, formatTND } from '@/types';
+import { sousZonesDe } from '@/utils/zones';
 
 /**
  * Parcel Detail Screen
@@ -51,6 +52,32 @@ export default function ParcelDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  // Sous-zone choisie par le livreur (rangement de sa tournée).
+  const [sousZoneVisible, setSousZoneVisible] = useState(false);
+  const [sousZoneEnCours, setSousZoneEnCours] = useState(false);
+  const [sousZoneErreur, setSousZoneErreur] = useState<string | null>(null);
+  const [sousZonesTournee, setSousZonesTournee] = useState<{ nom: string; count: number }[]>([]);
+  const ouvrirSousZone = () => {
+    setSousZoneErreur(null);
+    setSousZoneVisible(true);
+    runsheetsService
+      .getActiveRunsheet()
+      .then((r) => setSousZonesTournee(sousZonesDe(r.parcels)))
+      .catch(() => setSousZonesTournee([]));
+  };
+  const enregistrerSousZone = async (valeur: string | null) => {
+    if (!parcel) return;
+    setSousZoneEnCours(true);
+    setSousZoneErreur(null);
+    try {
+      setParcel(await runsheetsService.setSubZone(parcel.id, valeur));
+      setSousZoneVisible(false);
+    } catch (e) {
+      setSousZoneErreur(e instanceof Error ? e.message : 'Sous-zone impossible à enregistrer.');
+    } finally {
+      setSousZoneEnCours(false);
+    }
+  };
 
   // Modals for actions
   const [returnModalVisible, setReturnModalVisible] = useState(false);
@@ -333,6 +360,18 @@ export default function ParcelDetailScreen() {
                 {parcel.contentSummary && (
                   <Text style={styles.factMuted}>Contenu : {parcel.contentSummary}</Text>
                 )}
+                <TouchableOpacity
+                  testID="sous-zone-colis"
+                  activeOpacity={0.8}
+                  onPress={ouvrirSousZone}
+                  style={styles.sousZoneRow}
+                >
+                  <Ionicons name="pricetag-outline" size={16} color={colors.primary} />
+                  <Text style={styles.sousZoneLabel} numberOfLines={1}>
+                    {parcel.subZone ? `Sous-zone : ${parcel.subZone}` : 'Ranger dans une sous-zone'}
+                  </Text>
+                  <Text style={styles.sousZoneAction}>{parcel.subZone ? 'Modifier' : 'Ajouter'}</Text>
+                </TouchableOpacity>
                 {(parcel.isFragile || parcel.allowOpen) && (
                   <View style={styles.flagsRow}>
                     {parcel.isFragile && <Badge label="FRAGILE" status="warning" size="sm" />}
@@ -461,6 +500,17 @@ export default function ParcelDetailScreen() {
           </>
         )}
       </ScrollView>
+
+      <SubZoneSheet
+        visible={sousZoneVisible}
+        count={1}
+        current={parcel?.subZone ?? null}
+        existing={sousZonesTournee}
+        saving={sousZoneEnCours}
+        error={sousZoneErreur}
+        onClose={() => setSousZoneVisible(false)}
+        onSave={(v) => void enregistrerSousZone(v)}
+      />
 
       {/* ========================================================= */}
       {/* MODAL: Retourner le colis (Demande un motif) */}
@@ -719,6 +769,29 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.primary,
     fontWeight: '700',
+  },
+  sousZoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.button,
+    borderWidth: 1,
+    borderColor: 'rgba(227, 30, 43, 0.25)',
+    backgroundColor: 'rgba(227, 30, 43, 0.04)',
+  },
+  sousZoneLabel: {
+    ...typography.bodySmall,
+    flex: 1,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  sousZoneAction: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '800',
   },
   factMuted: {
     ...typography.caption,

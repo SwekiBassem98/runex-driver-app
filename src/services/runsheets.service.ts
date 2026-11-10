@@ -23,6 +23,8 @@ export interface RunsheetsService {
   postponeParcel(parcelId: string, payload: PostponeParcelPayload): Promise<Parcel>;
   partialDelivery(parcelId: string, payload: PartialDeliveryPayload): Promise<Parcel>;
   exchangeParcel(parcelId: string, payload: ExchangeParcelPayload): Promise<Parcel>;
+  /** Sous-zone choisie par le livreur pour ranger ses colis (vide : retirée). */
+  setSubZone(parcelId: string, subZone: string | null): Promise<Parcel>;
 }
 
 // Simulated network delay helper (300ms - 600ms)
@@ -405,6 +407,17 @@ class MockRunsheetsService implements RunsheetsService {
       updatedAt: new Date().toISOString(),
     };
 
+    this.inMemoryParcels = this.inMemoryParcels.map((p) => (p.id === parcelId ? updated : p));
+    return updated;
+  }
+
+  async setSubZone(parcelId: string, subZone: string | null): Promise<Parcel> {
+    await delay(150);
+    const parcel = this.inMemoryParcels.find((p) => p.id === parcelId);
+    if (!parcel) {
+      throw new AppApiError(404, 'Colis introuvable.', 'PARCEL_NOT_FOUND');
+    }
+    const updated: Parcel = { ...parcel, subZone: subZone?.trim() || null, updatedAt: new Date().toISOString() };
     this.inMemoryParcels = this.inMemoryParcels.map((p) => (p.id === parcelId ? updated : p));
     return updated;
   }

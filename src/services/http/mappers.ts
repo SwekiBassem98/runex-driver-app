@@ -64,6 +64,8 @@ export interface ApiPackage {
   expectedDeliveryDate?: string;
   notes?: string;
   driverNote?: string;
+  /** Sous-zone choisie par le livreur (PUT /colis/:id/sous-zone). */
+  driverSubZone?: string | null;
   deliveryAttempts?: { reason?: string; status?: string }[];
   returns?: { reason?: string }[];
   exchange?: unknown;
@@ -182,6 +184,7 @@ export function toParcel(p: ApiPackage, sequenceOrder?: number): Parcel {
     allowOpen: p.allowOpen,
     isFragile: p.isFragile,
     packageType: p.packageType,
+    subZone: p.driverSubZone ?? null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

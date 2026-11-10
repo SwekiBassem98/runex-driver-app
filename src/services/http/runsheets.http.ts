@@ -49,6 +49,13 @@ class HttpRunsheetsService implements RunsheetsService {
     );
   }
 
+  /** Sous-zone du colis, choisie par le livreur ; vide : retirée. */
+  async setSubZone(parcelId: string, subZone: string | null): Promise<Parcel> {
+    return toParcel(
+      await unwrap<ApiPackage>(apiClient.put(`/colis/${enc(parcelId)}/sous-zone`, { sousZone: subZone ?? '' }))
+    );
+  }
+
   /** Démarrer la livraison (le colis passe « en cours de livraison »). */
   async startDelivery(parcelId: string): Promise<Parcel> {
     return this.act(parcelId, 'start', {});
