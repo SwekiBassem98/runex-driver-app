@@ -80,6 +80,8 @@ export interface Parcel {
   backendStatus?: string;
   backendStatusLabel?: string;
   collectedAmount?: number;
+  /** Sous-zone choisie par le livreur pour ranger sa tournée (modifiable). */
+  subZone?: string | null;
 }
 
 export type RunsheetStatus = 'active' | 'in_progress' | 'completed' | 'closed';

@@ -8,6 +8,11 @@ import { Parcel, ParcelStatus, formatTND } from '@/types';
 export interface ParcelListItemProps {
   parcel: Parcel;
   onPress: (parcel: Parcel) => void;
+  /** Appui long : choisir des colis (pour leur donner une sous-zone). */
+  onLongPress?: (parcel: Parcel) => void;
+  /** Mode choix : une case à cocher remplace l'ouverture du colis. */
+  selectable?: boolean;
+  selected?: boolean;
   showReturnReason?: boolean;
   style?: StyleProp<ViewStyle>;
 }
@@ -45,6 +50,9 @@ export const getParcelStatusBadge = (
 export const ParcelListItem: React.FC<ParcelListItemProps> = ({
   parcel,
   onPress,
+  onLongPress,
+  selectable = false,
+  selected = false,
   showReturnReason = true,
   style,
 }) => {
@@ -55,11 +63,21 @@ export const ParcelListItem: React.FC<ParcelListItemProps> = ({
     <TouchableOpacity
       activeOpacity={0.8}
       onPress={() => onPress(parcel)}
-      style={[styles.card, isReturned && styles.cardReturned, style]}
+      onLongPress={onLongPress ? () => onLongPress(parcel) : undefined}
+      delayLongPress={350}
+      accessibilityState={selectable ? { selected } : undefined}
+      style={[styles.card, isReturned && styles.cardReturned, selected && styles.cardSelected, style]}
     >
       {/* Top Row: Code, Sequence Order, Status Badge */}
       <View style={styles.headerRow}>
         <View style={styles.codeGroup}>
+          {selectable && (
+            <Ionicons
+              name={selected ? 'checkbox' : 'square-outline'}
+              size={20}
+              color={selected ? colors.primary : colors.text.secondary}
+            />
+          )}
           <Text style={styles.codeText}>{parcel.code}</Text>
           {parcel.sequenceOrder !== undefined && (
             <View style={styles.seqPill}>
@@ -70,6 +88,16 @@ export const ParcelListItem: React.FC<ParcelListItemProps> = ({
 
         <Badge label={badge.label} status={badge.badgeStatus} dot size="sm" />
       </View>
+
+      {/* Sous-zone choisie par le livreur */}
+      {!!parcel.subZone && (
+        <View style={styles.subZonePill}>
+          <Ionicons name="pricetag" size={11} color={colors.primary} />
+          <Text style={styles.subZoneText} numberOfLines={1}>
+            {parcel.subZone}
+          </Text>
+        </View>
+      )}
 
       {/* Client Name */}
       <Text style={styles.clientName} numberOfLines={1}>
@@ -133,6 +161,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     ...shadows.card,
+  },
+  cardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(227, 30, 43, 0.04)',
+  },
+  subZonePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    backgroundColor: 'rgba(227, 30, 43, 0.08)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radii.pill,
+    marginTop: 4,
+    maxWidth: '100%',
+  },
+  subZoneText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
   },
   cardReturned: {
     borderColor: 'rgba(227, 30, 43, 0.2)',

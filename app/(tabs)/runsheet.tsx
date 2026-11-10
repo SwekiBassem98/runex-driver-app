@@ -22,11 +22,13 @@ import {
   BottomNav,
   SecondaryButton,
   ParcelListItem,
+  SubZoneSheet,
 } from '@/components';
 import { useActiveRunsheet } from '@/hooks';
 import { driversService } from '@/services/drivers.service';
+import { runsheetsService } from '@/services/runsheets.service';
 import { Zone } from '@/types';
-import { colisDansZone, jourTunis } from '@/utils/zones';
+import { colisDansSousZone, colisDansZone, jourTunis, sousZone, sousZonesDe, trierParSousZone } from '@/utils/zones';
 import { useUiStore } from '@/store/ui.store';
 
 /**
@@ -35,6 +37,11 @@ import { useUiStore } from '@/store/ui.store';
  *
  * Uses useActiveRunsheet() hook, preserves the full Runsheet object in state,
  * and performs all filtering and searching client-side in-memory.
+ *
+ * Sous-zones : un appui long sur un colis ouvre le mode « choix » ; le livreur
+ * coche ses colis et leur donne une sous-zone (modifiable). Les colis rangés
+ * dans une sous-zone passent en tête de la liste, et chaque sous-zone figure
+ * dans le filtre « Zones » avec son nombre de colis.
  */
 export default function RunsheetScreen() {
   const router = useRouter();
@@ -56,6 +63,20 @@ export default function RunsheetScreen() {
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
   const [availableZones, setAvailableZones] = useState<Zone[]>([]);
   const [zoneModalVisible, setZoneModalVisible] = useState(false);
+  // Sous-zone choisie dans le filtre (exclusive d'une zone).
+  const [selectedSousZone, setSelectedSousZone] = useState<string | null>(null);
+  // Mode choix : colis cochés pour leur donner une sous-zone.
+  const [choix, setChoix] = useState<Set<string>>(new Set());
+  const modeChoix = choix.size > 0;
+  const [sousZoneVisible, setSousZoneVisible] = useState(false);
+  const [sousZoneEnCours, setSousZoneEnCours] = useState(false);
+  const [sousZoneErreur, setSousZoneErreur] = useState<string | null>(null);
+  const sousZones = useMemo(() => sousZonesDe(allParcels), [allParcels]);
+  // Une sous-zone choisie dans le filtre qui n'existe plus (retirée) ne filtre plus rien.
+  const sousZoneFiltre =
+    selectedSousZone && sousZones.some((sz) => sz.nom.toLowerCase() === selectedSousZone.toLowerCase())
+      ? selectedSousZone
+      : null;
 
   // Zones du jour du livreur (la plateforme efface celles de la veille). On les
   // relit à l'ouverture et quand la journée change, et un filtre choisi la
@@ -156,9 +177,11 @@ export default function RunsheetScreen() {
       }
     }
 
-    // 2. Zone Filter (identifiant de zone, ou gouvernorat + délégation)
+    // 2. Zone Filter (identifiant de zone, ou gouvernorat + délégation), ou sous-zone du livreur
     if (selectedZone) {
       result = result.filter((p) => colisDansZone(p, selectedZone));
+    } else if (sousZoneFiltre) {
+      result = result.filter((p) => colisDansSousZone(p, sousZoneFiltre));
     }
 
     // 3. Search Query Filter (code, client name, phone, address)
@@ -173,13 +196,43 @@ export default function RunsheetScreen() {
       );
     }
 
-    return result;
-  }, [allParcels, activeStatusFilter, selectedZone, searchQuery]);
+    // 4. Colis rangés dans une sous-zone : en tête de la liste
+    return trierParSousZone(result);
+  }, [allParcels, activeStatusFilter, selectedZone, sousZoneFiltre, searchQuery]);
 
   const handleResetFilters = () => {
     setActiveStatusFilter('all');
     setSelectedZone(null);
+    setSelectedSousZone(null);
     setSearchQuery('');
+  };
+
+
+  const basculer = (id: string) =>
+    setChoix((c) => {
+      const n = new Set(c);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const colisChoisis = allParcels.filter((p) => choix.has(p.id));
+  const sousZoneCommune = (() => {
+    const noms = new Set(colisChoisis.map((p) => sousZone(p) ?? ''));
+    return noms.size === 1 ? [...noms][0] || null : null;
+  })();
+  const enregistrerSousZone = async (valeur: string | null) => {
+    setSousZoneEnCours(true);
+    setSousZoneErreur(null);
+    try {
+      for (const id of choix) await runsheetsService.setSubZone(id, valeur);
+      setSousZoneVisible(false);
+      setChoix(new Set());
+      await onRefresh();
+    } catch (e) {
+      setSousZoneErreur(e instanceof Error ? e.message : 'Sous-zone impossible à enregistrer.');
+    } finally {
+      setSousZoneEnCours(false);
+    }
   };
 
   const parcelCount = allParcels.length;
@@ -214,9 +267,9 @@ export default function RunsheetScreen() {
             >
               <Ionicons name="map-outline" size={16} color={colors.text.inverse} />
               <Text style={styles.zonesPillText}>
-                {selectedZone ? selectedZone.name.replace('Zone ', '') : 'Zones'}
+                {selectedZone ? selectedZone.name.replace('Zone ', '') : sousZoneFiltre ?? 'Zones'}
               </Text>
-              {selectedZone && <View style={styles.activeZoneDot} />}
+              {(selectedZone || sousZoneFiltre) && <View style={styles.activeZoneDot} />}
             </TouchableOpacity>
           </View>
         </View>
@@ -274,15 +327,51 @@ export default function RunsheetScreen() {
             <View
               style={[
                 styles.zoneIndicatorDot,
-                { backgroundColor: selectedZone ? colors.primary : colors.text.secondary },
+                { backgroundColor: selectedZone || sousZoneFiltre ? colors.primary : colors.text.secondary },
               ]}
             />
             <Text style={styles.zoneDropdownText}>
-              {selectedZone ? selectedZone.name : 'Toutes les Zones'}
+              {selectedZone ? selectedZone.name : sousZoneFiltre ? `Sous-zone : ${sousZoneFiltre}` : 'Toutes les Zones'}
             </Text>
           </View>
           <Ionicons name="chevron-down" size={18} color={colors.text.secondary} />
         </TouchableOpacity>
+
+        {/* Mode choix : sous-zone des colis cochés */}
+        {modeChoix ? (
+          <View style={styles.choixBar} testID="barre-choix">
+            <Text style={styles.choixText}>
+              {choix.size} colis choisi{choix.size > 1 ? 's' : ''}
+            </Text>
+            <TouchableOpacity
+              testID="choix-tout"
+              onPress={() => setChoix(new Set(filteredParcels.map((p) => p.id)))}
+              style={styles.choixBtnGhost}
+            >
+              <Text style={styles.choixBtnGhostText}>Tout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setChoix(new Set())} style={styles.choixBtnGhost}>
+              <Text style={styles.choixBtnGhostText}>Annuler</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="choix-sous-zone"
+              onPress={() => {
+                setSousZoneErreur(null);
+                setSousZoneVisible(true);
+              }}
+              style={styles.choixBtn}
+            >
+              <Ionicons name="pricetag-outline" size={15} color={colors.text.inverse} />
+              <Text style={styles.choixBtnText}>Sous-zone</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          allParcels.length > 0 && (
+            <Text style={styles.choixAide}>
+              Appui long sur un colis pour le ranger dans une sous-zone.
+            </Text>
+          )
+        )}
       </View>
 
       {/* ============================================================== */}
@@ -357,7 +446,10 @@ export default function RunsheetScreen() {
             <ParcelListItem
               key={parcel.id}
               parcel={parcel}
-              onPress={(p) => router.push(`/runsheet/${p.id}`)}
+              selectable={modeChoix}
+              selected={choix.has(parcel.id)}
+              onLongPress={(p) => basculer(p.id)}
+              onPress={(p) => (modeChoix ? basculer(p.id) : router.push(`/runsheet/${p.id}`))}
             />
           ))
         )}
@@ -403,32 +495,68 @@ export default function RunsheetScreen() {
               activeOpacity={0.8}
               onPress={() => {
                 setSelectedZone(null);
+                setSelectedSousZone(null);
                 setZoneModalVisible(false);
               }}
               style={[
                 styles.zoneOptionItem,
-                selectedZone === null && styles.zoneOptionItemSelected,
+                selectedZone === null && !sousZoneFiltre && styles.zoneOptionItemSelected,
               ]}
             >
               <View style={styles.zoneOptionLeft}>
                 <Ionicons
                   name="grid-outline"
                   size={18}
-                  color={selectedZone === null ? colors.primary : colors.text.secondary}
+                  color={selectedZone === null && !sousZoneFiltre ? colors.primary : colors.text.secondary}
                 />
                 <Text
                   style={[
                     styles.zoneOptionName,
-                    selectedZone === null && styles.zoneOptionNameSelected,
+                    selectedZone === null && !sousZoneFiltre && styles.zoneOptionNameSelected,
                   ]}
                 >
                   Toutes les Zones
                 </Text>
               </View>
-              {selectedZone === null && (
+              {selectedZone === null && !sousZoneFiltre && (
                 <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
               )}
             </TouchableOpacity>
+
+            <ScrollView style={styles.zoneList} showsVerticalScrollIndicator={false}>
+            {/* Mes sous-zones (rangement du livreur), en premier */}
+            {sousZones.length > 0 && <Text style={styles.zoneSectionTitle}>Mes sous-zones</Text>}
+            {sousZones.map((sz) => {
+              const isSelected = sousZoneFiltre?.toLowerCase() === sz.nom.toLowerCase();
+              return (
+                <TouchableOpacity
+                  key={`sous-${sz.nom}`}
+                  testID={`filtre-sous-zone-${sz.nom}`}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setSelectedZone(null);
+                    setSelectedSousZone(sz.nom);
+                    setZoneModalVisible(false);
+                  }}
+                  style={[styles.zoneOptionItem, isSelected && styles.zoneOptionItemSelected]}
+                >
+                  <View style={styles.zoneOptionLeft}>
+                    <Ionicons name="pricetag" size={18} color={isSelected ? colors.primary : colors.text.secondary} />
+                    <View>
+                      <Text style={[styles.zoneOptionName, isSelected && styles.zoneOptionNameSelected]}>{sz.nom}</Text>
+                      <Text style={styles.zoneOptionCode}>Ma sous-zone</Text>
+                    </View>
+                  </View>
+                  <View style={styles.zoneOptionRight}>
+                    <View style={styles.zoneCountPill}>
+                      <Text style={styles.zoneCountText}>{sz.count}</Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+            {sousZones.length > 0 && zoneOptions.length > 0 && <Text style={styles.zoneSectionTitle}>Zones</Text>}
 
             {zoneOptions.length === 0 && (
               <Text style={styles.zoneEmptyText}>
@@ -446,6 +574,7 @@ export default function RunsheetScreen() {
                   activeOpacity={0.8}
                   onPress={() => {
                     setSelectedZone(zone);
+                    setSelectedSousZone(null);
                     setZoneModalVisible(false);
                   }}
                   style={[styles.zoneOptionItem, isSelected && styles.zoneOptionItemSelected]}
@@ -479,9 +608,21 @@ export default function RunsheetScreen() {
                 </TouchableOpacity>
               );
             })}
+            </ScrollView>
           </View>
         </View>
       </Modal>
+
+      <SubZoneSheet
+        visible={sousZoneVisible}
+        count={choix.size}
+        current={sousZoneCommune}
+        existing={sousZones}
+        saving={sousZoneEnCours}
+        error={sousZoneErreur}
+        onClose={() => setSousZoneVisible(false)}
+        onSave={(v) => void enregistrerSousZone(v)}
+      />
 
       {/* Persistent Bottom Navigation with Runsheet Active */}
       <BottomNav
@@ -497,6 +638,66 @@ export default function RunsheetScreen() {
 }
 
 const styles = StyleSheet.create({
+  zoneList: {
+    maxHeight: 420,
+  },
+  zoneSectionTitle: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  choixBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radii.button,
+    backgroundColor: 'rgba(227, 30, 43, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(227, 30, 43, 0.25)',
+  },
+  choixText: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.text.primary,
+    flexGrow: 1,
+  },
+  choixBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radii.pill,
+  },
+  choixBtnText: {
+    color: colors.text.inverse,
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  choixBtnGhost: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+  },
+  choixBtnGhostText: {
+    color: colors.text.secondary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  choixAide: {
+    ...typography.caption,
+    color: colors.text.muted,
+    marginTop: spacing.xs,
+    fontSize: 11,
+  },
   zoneEmptyText: {
     ...typography.caption,
     color: colors.text.secondary,
