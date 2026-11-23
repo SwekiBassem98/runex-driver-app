@@ -23,6 +23,7 @@ import { Badge, BadgeStatus, PrimaryButton, SecondaryButton, ErrorBanner, SubZon
 import { runsheetsService } from '@/services/runsheets.service';
 import { Parcel, ParcelStatus, ApiError, formatTND } from '@/types';
 import { sousZonesDe } from '@/utils/zones';
+import type { CorrectionMotif } from '@/services/runsheets.service';
 
 /**
  * Parcel Detail Screen
@@ -76,6 +77,34 @@ export default function ParcelDetailScreen() {
       setSousZoneErreur(e instanceof Error ? e.message : 'Sous-zone impossible à enregistrer.');
     } finally {
       setSousZoneEnCours(false);
+    }
+  };
+
+  // Corriger un geste : erreur du livreur, ou client qui veut finalement son colis.
+  const [correction, setCorrection] = useState<CorrectionMotif | null>(null);
+  const [correctionNote, setCorrectionNote] = useState('');
+  const [correctionInfo, setCorrectionInfo] = useState<string | null>(null);
+  const confirmerCorrection = async () => {
+    if (!parcel || !correction) return;
+    const motif = correction;
+    setActionLoading('correct');
+    setError(null);
+    setCorrection(null);
+    try {
+      const corrige = await runsheetsService.correctAction(parcel.id, motif, correctionNote.trim() || undefined);
+      setParcel(corrige);
+      setCorrectionNote('');
+      setCorrectionInfo(
+        motif === 'CLIENT'
+          ? 'Colis remis en livraison : livrez-le au client.'
+          : 'Action annulée : choisissez le bon geste pour ce colis.'
+      );
+      feedback.success();
+    } catch (err: unknown) {
+      feedback.error();
+      setError(err as ApiError);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -254,6 +283,11 @@ export default function ParcelDetailScreen() {
   const is403 = error?.status === 403;
   // Actions de livraison : seulement sur un colis qui attend encore le livreur.
   const actionable = !!parcel && (parcel.status === 'in_transit' || parcel.status === 'postponed');
+  // Gestes corrigeables tant que la tournée n'est pas rentrée au dépôt (le serveur vérifie).
+  const livreParErreurPossible =
+    !!parcel && (parcel.status === 'delivered' || parcel.status === 'partially_delivered' || parcel.status === 'exchanged');
+  const retourne = !!parcel && parcel.status === 'returned' && parcel.backendStatus === 'RETOUR_DEPOT';
+  const reporte = !!parcel && parcel.status === 'postponed';
 
   return (
     <View style={styles.container}>
@@ -445,6 +479,13 @@ export default function ParcelDetailScreen() {
               </View>
             </View>
 
+            {!!correctionInfo && (
+              <View style={[styles.card, styles.correctionInfo]} testID="correction-info">
+                <Ionicons name="checkmark-circle" size={18} color={colors.cash.green} />
+                <Text style={styles.correctionInfoText}>{correctionInfo}</Text>
+              </View>
+            )}
+
             {/* Action Buttons Section */}
             {!actionable ? (
               <View style={styles.card}>
@@ -452,6 +493,30 @@ export default function ParcelDetailScreen() {
                   Aucune action de livraison : ce colis est «{' '}
                   {parcel.backendStatusLabel ?? getStatusBadge(parcel.status).label} ».
                 </Text>
+                {(livreParErreurPossible || retourne) && (
+                  <View style={styles.correctionBox}>
+                    <Text style={styles.correctionTitle}>Corriger</Text>
+                    {retourne && (
+                      <PrimaryButton
+                        testID="relivrer"
+                        title="Le client veut son colis : le livrer"
+                        iconName="bicycle-outline"
+                        loading={actionLoading === 'correct'}
+                        onPress={() => setCorrection('CLIENT')}
+                        style={styles.actionBtn}
+                      />
+                    )}
+                    <SecondaryButton
+                      testID="corriger-erreur"
+                      title={livreParErreurPossible ? 'Annuler « Livré » (erreur)' : 'Annuler le retour (erreur)'}
+                      iconName="arrow-undo-outline"
+                      variant="outline"
+                      loading={actionLoading === 'correct'}
+                      onPress={() => setCorrection('ERREUR')}
+                      style={styles.actionBtn}
+                    />
+                  </View>
+                )}
               </View>
             ) : (
               <View style={styles.actionsSection}>
@@ -486,6 +551,19 @@ export default function ParcelDetailScreen() {
                   style={styles.actionBtn}
                 />
 
+                {/* Reporté dans cette tournée par erreur : effacer le report. */}
+                {reporte && (
+                  <SecondaryButton
+                    testID="corriger-erreur"
+                    title="Annuler le report (erreur)"
+                    iconName="arrow-undo-outline"
+                    variant="outline"
+                    loading={actionLoading === 'correct'}
+                    onPress={() => setCorrection('ERREUR')}
+                    style={styles.actionBtn}
+                  />
+                )}
+
                 {/* 4. Retourner */}
                 <SecondaryButton
                   title="Retourner le colis"
@@ -511,6 +589,45 @@ export default function ParcelDetailScreen() {
         onClose={() => setSousZoneVisible(false)}
         onSave={(v) => void enregistrerSousZone(v)}
       />
+
+      {/* ========================================================= */}
+      {/* MODAL: Corriger un geste */}
+      {/* ========================================================= */}
+      <Modal visible={correction !== null} transparent animationType="slide" onRequestClose={() => setCorrection(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard} testID="modal-correction">
+            <Text style={styles.modalTitle}>
+              {correction === 'CLIENT' ? 'Livrer finalement ce colis ?' : 'Annuler ce geste ?'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {correction === 'CLIENT'
+                ? 'Le client a rappelé et veut son colis. Il repasse « En livraison » dans votre tournée ; le retour reste dans l’historique.'
+                : livreParErreurPossible
+                  ? `« Livré » sera annulé : le montant encaissé (${formatTND(parcel?.collectedAmount ?? parcel?.codAmount ?? 0)}) est retiré de votre caisse et le colis repasse « En livraison ».`
+                  : 'Le geste fait par erreur est effacé (avec sa tentative) et le colis repasse « En livraison ».'}
+            </Text>
+            <TextInput
+              testID="correction-note"
+              style={styles.correctionInput}
+              value={correctionNote}
+              onChangeText={setCorrectionNote}
+              placeholder="Commentaire (facultatif)"
+              placeholderTextColor={colors.text.muted}
+              maxLength={300}
+            />
+            <View style={styles.modalActionsRow}>
+              <SecondaryButton title="Fermer" variant="outline" onPress={() => setCorrection(null)} fullWidth={false} style={{ flex: 1 }} />
+              <PrimaryButton
+                testID="confirmer-correction"
+                title="Confirmer"
+                onPress={() => void confirmerCorrection()}
+                fullWidth={false}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ========================================================= */}
       {/* MODAL: Retourner le colis (Demande un motif) */}
@@ -769,6 +886,39 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.text.primary,
     fontWeight: '700',
+  },
+  correctionBox: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  correctionTitle: {
+    ...typography.caption,
+    fontWeight: '800',
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  correctionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  correctionInfoText: {
+    ...typography.bodySmall,
+    flex: 1,
+    color: colors.text.primary,
+    fontWeight: '600',
+  },
+  correctionInput: {
+    ...typography.body,
+    color: colors.text.primary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.md,
+    height: 46,
+    marginTop: spacing.md,
   },
   sousZoneRow: {
     flexDirection: 'row',

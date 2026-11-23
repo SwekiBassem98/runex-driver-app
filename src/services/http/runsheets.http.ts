@@ -1,5 +1,5 @@
 import { apiClient, unwrap } from '@/services/api-client';
-import type { RunsheetsService } from '@/services/runsheets.service';
+import type { CorrectionMotif, RunsheetsService } from '@/services/runsheets.service';
 import {
   AppApiError,
   DeliverParcelPayload,
@@ -47,6 +47,11 @@ class HttpRunsheetsService implements RunsheetsService {
     return toParcel(
       await unwrap<ApiPackage>(apiClient.post(`/colis/${enc(parcelId)}/${action}`, body))
     );
+  }
+
+  /** Corriger le dernier geste (erreur) ou relivrer un colis que le client veut finalement. */
+  async correctAction(parcelId: string, motif: CorrectionMotif, commentaire?: string): Promise<Parcel> {
+    return this.act(parcelId, 'corriger', { motif, ...(commentaire ? { commentaire } : {}) });
   }
 
   /** Sous-zone du colis, choisie par le livreur ; vide : retirée. */

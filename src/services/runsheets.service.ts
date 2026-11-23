@@ -25,7 +25,15 @@ export interface RunsheetsService {
   exchangeParcel(parcelId: string, payload: ExchangeParcelPayload): Promise<Parcel>;
   /** Sous-zone choisie par le livreur pour ranger ses colis (vide : retirée). */
   setSubZone(parcelId: string, subZone: string | null): Promise<Parcel>;
+  /**
+   * Corriger le dernier geste sur un colis de la tournée : `ERREUR` (livré,
+   * reporté ou retourné par erreur) ou `CLIENT` (le client veut finalement son
+   * colis). Le colis redevient « en livraison ».
+   */
+  correctAction(parcelId: string, motif: CorrectionMotif, commentaire?: string): Promise<Parcel>;
 }
+
+export type CorrectionMotif = 'ERREUR' | 'CLIENT';
 
 // Simulated network delay helper (300ms - 600ms)
 const delay = (ms?: number) =>
@@ -407,6 +415,20 @@ class MockRunsheetsService implements RunsheetsService {
       updatedAt: new Date().toISOString(),
     };
 
+    this.inMemoryParcels = this.inMemoryParcels.map((p) => (p.id === parcelId ? updated : p));
+    return updated;
+  }
+
+  async correctAction(parcelId: string, motif: CorrectionMotif): Promise<Parcel> {
+    await delay(150);
+    const parcel = this.inMemoryParcels.find((p) => p.id === parcelId);
+    if (!parcel) {
+      throw new AppApiError(404, 'Colis introuvable.', 'PARCEL_NOT_FOUND');
+    }
+    if (motif === 'CLIENT' && (parcel.status === 'delivered' || parcel.status === 'partially_delivered' || parcel.status === 'exchanged')) {
+      throw new AppApiError(400, 'Ce colis est livré : utilisez « Annuler (erreur) ».', 'CORRECTION_REFUSED');
+    }
+    const updated: Parcel = { ...parcel, status: 'in_transit', backendStatusLabel: undefined, collectedAmount: undefined, updatedAt: new Date().toISOString() };
     this.inMemoryParcels = this.inMemoryParcels.map((p) => (p.id === parcelId ? updated : p));
     return updated;
   }

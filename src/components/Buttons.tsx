@@ -24,6 +24,8 @@ export interface BaseButtonProps {
   size?: 'sm' | 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
+  /** Repère des tests de bout en bout. */
+  testID?: string;
 }
 
 export interface PrimaryButtonProps extends BaseButtonProps {
@@ -46,6 +48,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   size = 'md',
   style,
   textStyle,
+  testID,
 }) => {
   const isDisabled = disabled || loading;
 
@@ -55,6 +58,7 @@ export const PrimaryButton: React.FC<PrimaryButtonProps> = ({
 
   return (
     <TouchableOpacity
+      testID={testID}
       activeOpacity={0.85}
       onPress={onPress}
       disabled={isDisabled}
@@ -111,6 +115,7 @@ export const SecondaryButton: React.FC<SecondaryButtonProps> = ({
   size = 'md',
   style,
   textStyle,
+  testID,
 }) => {
   const isDisabled = disabled || loading;
 
@@ -123,6 +128,7 @@ export const SecondaryButton: React.FC<SecondaryButtonProps> = ({
 
   return (
     <TouchableOpacity
+      testID={testID}
       activeOpacity={0.8}
       onPress={onPress}
       disabled={isDisabled}
